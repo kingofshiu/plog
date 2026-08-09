@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>P.Log</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  :root {
+    --bg:#0E0E10; --card:#1A1B1E; --line:#2A2B30;
+    --text:#ECECEC; --sub:#9A9AA0; --muted:#6A6B70;
+    --dc:#E86A00; --ac:#3D8BE8; --accent:#E86A00; --green:#3ECF6E;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text);
+    font-family:-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;
+    padding:20px; max-width:1080px; margin:0 auto; }
+  h1 { font-size:22px; }
+  h2 { font-size:15px; color:var(--sub); font-weight:600; margin-bottom:10px; }
+  header { display:flex; align-items:baseline; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
+  header .sub { color:var(--sub); font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:16px; margin-bottom:16px; }
+  /* 스탯 타일 */
+  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:12px; margin-bottom:16px; }
+  .tile { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .tile .k { font-size:13px; color:var(--sub); }
+  .tile .v { font-size:24px; font-weight:700; margin-top:4px; }
+  .tile .u { font-size:13px; color:var(--sub); font-weight:400; }
+  /* 차트 */
+  .charts { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:760px){ .charts { grid-template-columns:1fr; } }
+  .chart-wrap { position:relative; height:180px; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--sub); margin-top:8px; }
+  .legend .sw { display:inline-block; width:10px; height:10px; border-radius:3px;
+    margin-right:5px; vertical-align:-1px; }
+  #tooltip { position:fixed; display:none; background:#232428; border:1px solid var(--line);
+    border-radius:8px; padding:8px 10px; font-size:12px; color:var(--text);
+    pointer-events:none; z-index:99; white-space:pre; box-shadow:0 4px 14px rgba(0,0,0,.5); }
+  /* 목록 */
+  .row { display:flex; align-items:center; gap:12px; padding:10px 4px;
+    border-bottom:1px solid var(--line); font-size:14px; cursor:default; }
+  .row:last-child { border-bottom:none; }
+  .row .grow { flex:1; }
+  .row .big { font-weight:700; }
+  .row .dim { color:var(--sub); font-size:12.5px; }
+  .badge { font-size:11px; font-weight:700; border-radius:5px; padding:2px 7px; }
+  .badge.DC { background:rgba(232,106,0,.16); color:#FF9E52; }
+  .badge.AC { background:rgba(61,139,232,.16); color:#7FBCFF; }
+  .clickable { cursor:pointer; }
+  .clickable:hover { background:#202126; border-radius:8px; }
+  .monthnav { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .monthnav button { background:#232428; color:var(--text); border:1px solid var(--line);
+    border-radius:8px; width:36px; height:32px; font-size:14px; cursor:pointer; }
+  .monthnav .title { font-weight:700; }
+  #map, #tripmap { height:300px; border-radius:10px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:760px){ .grid2 { grid-template-columns:1fr; } }
+  .empty { color:var(--muted); font-size:13.5px; padding:14px 4px; }
+  /* 설정 화면 */
+  #setup { max-width:520px; margin:60px auto; }
+  #setup input { width:100%; background:#232428; border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:10px 12px; font-size:14px; margin:6px 0 14px; }
+  #setup label { font-size:13px; color:var(--sub); }
+  #setup button { width:100%; background:var(--accent); border:none; color:#fff; font-weight:700;
+    padding:12px; border-radius:10px; font-size:15px; cursor:pointer; }
+  #err { color:#FF7B7B; font-size:13px; margin-top:10px; min-height:18px; }
+  /* 모달 */
+  #modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:50;
+    align-items:center; justify-content:center; padding:20px; }
+  #modal .inner { background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:16px; width:min(760px,100%); }
+  #modal .head { display:flex; justify-content:space-between; margin-bottom:10px; }
+  #modal .close { cursor:pointer; color:var(--sub); font-size:20px; }
+</style>
+</head>
+<body>
+
+<!-- 최초 접속: 연결 정보 입력 (브라우저 메모리/URL 해시에 저장) -->
+<div id="setup">
+  <h1 style="margin-bottom:24px">🔌 P.Log</h1>
+  <label>Supabase Project URL</label>
+  <input id="in-url" placeholder="https://xxxx.supabase.co">
+  <label>anon public 키</label>
+  <input id="in-key" placeholder="eyJhbGciOi...">
+  <label>차량 ID (앱 설정과 동일하게)</label>
+  <input id="in-dev" placeholder="p4-123456">
+  <button onclick="connect()">불러오기</button>
+  <div id="err"></div>
+  <p style="color:var(--muted);font-size:12.5px;margin-top:14px">
+    입력값은 주소창 # 뒤에 저장됩니다. 이 주소를 즐겨찾기하면 다음부터 바로 열립니다.<br>
+    (주소를 아는 사람은 기록을 볼 수 있으니 공유하지 마세요)
+  </p>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <h1>⚡ P.Log</h1>
+    <span class="sub" id="hd-dev"></span>
+    <span class="sub" id="hd-updated"></span>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="charts">
+    <div class="card">
+      <h2>월별 주행 거리</h2>
+      <div class="chart-wrap"><svg id="chart-km" width="100%" height="100%"></svg></div>
+    </div>
+    <div class="card">
+      <h2>월별 충전 비용</h2>
+      <div class="chart-wrap"><svg id="chart-cost" width="100%" height="100%"></svg></div>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--dc)"></span>급속 DC</span>
+        <span><span class="sw" style="background:var(--ac)"></span>완속 AC</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="monthnav">
+        <button onclick="moveMonth(-1)">◀</button>
+        <span class="title" id="month-title"></span>
+        <button onclick="moveMonth(1)">▶</button>
+      </div>
+      <h2 id="trips-sum"></h2>
+      <div id="trips-list"></div>
+      <h2 style="margin-top:20px" id="charges-sum"></h2>
+      <div id="charges-list"></div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2 id="park-title">주차 위치</h2>
+        <div id="map"></div>
+        <div class="dim" id="park-info" style="margin-top:8px;color:var(--sub);font-size:13px"></div>
+      </div>
+      <div class="card">
+        <h2>소모품</h2>
+        <div id="cons-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal"><div class="inner">
+  <div class="head"><b id="modal-title"></b><span class="close" onclick="closeModal()">✕</span></div>
+  <div id="tripmap"></div>
+</div></div>
+
+<div id="tooltip"></div>
+
+<script>
+"use strict";
+let sb = null, DEV = "", curMonth = new Date();
+curMonth.setDate(1);
+
+/* ---------- 연결 ---------- */
+function loadHash() {
+  try {
+    const h = location.hash.slice(1);
+    if (!h) return null;
+    return JSON.parse(decodeURIComponent(h));
+  } catch (e) { return null; }
+}
+function connect() {
+  const url = document.getElementById("in-url").value.trim().replace(/\/+$/,"");
+  const key = document.getElementById("in-key").value.trim();
+  const dev = document.getElementById("in-dev").value.trim();
+  if (!url || !key || !dev) { document.getElementById("err").textContent = "세 칸 모두 입력하세요"; return; }
+  location.hash = encodeURIComponent(JSON.stringify({u:url,k:key,d:dev}));
+  init(url, key, dev);
+}
+async function init(url, key, dev) {
+  sb = window.supabase.createClient(url, key);
+  DEV = dev;
+  const test = await sb.from("trip").select("client_id").limit(1);
+  if (test.error) {
+    document.getElementById("err").textContent = "연결 실패: " + test.error.message;
+    return;
+  }
+  document.getElementById("setup").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  document.getElementById("hd-dev").textContent = dev;
+  await Promise.all([loadTiles(), loadCharts(), loadMonth(), loadParking(), loadConsumables()]);
+}
+
+/* ---------- 유틸 ---------- */
+const fmtKm = v => (v/1000).toLocaleString("ko-KR",{maximumFractionDigits:1}) + " km";
+const fmtKwh = v => v.toLocaleString("ko-KR",{maximumFractionDigits:1}) + " kWh";
+const fmtWon = v => Math.round(v).toLocaleString("ko-KR") + "원";
+const fmtDt = ts => { const d = new Date(ts);
+  return (d.getMonth()+1)+"."+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+function monthRange(d) {
+  const a = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+  const b = new Date(d.getFullYear(), d.getMonth()+1, 1).getTime();
+  return [a, b];
+}
+
+/* ---------- 스탯 타일 ---------- */
+async function loadTiles() {
+  const [m0, m1] = monthRange(new Date());
+  const trips = await sb.from("trip").select("distance_m,energy_kwh,start_ts").eq("device_id", DEV);
+  const charges = await sb.from("charge").select("kwh,cost,start_ts").eq("device_id", DEV);
+  const t = trips.data || [], c = charges.data || [];
+  const totalM = t.reduce((s,r)=>s+(r.distance_m||0),0);
+  const totalE = t.reduce((s,r)=>s+(r.energy_kwh||0),0);
+  const mKm = t.filter(r=>r.start_ts>=m0&&r.start_ts<m1).reduce((s,r)=>s+(r.distance_m||0),0);
+  const mCost = c.filter(r=>r.start_ts>=m0&&r.start_ts<m1).reduce((s,r)=>s+(r.cost||0),0);
+  const tiles = [
+    ["누적 주행(기록)", fmtKm(totalM)],
+    ["이번 달 주행", fmtKm(mKm)],
+    ["이번 달 충전비", fmtWon(mCost)],
+    ["평균 전비", totalE>0.5 ? (totalM/1000/totalE).toFixed(1)+" km/kWh" : "-"]
+  ];
+  document.getElementById("tiles").innerHTML =
+    tiles.map(x=>`<div class="tile"><div class="k">${x[0]}</div><div class="v">${x[1]}</div></div>`).join("");
+  const last = Math.max(0, ...t.map(r=>r.start_ts), ...c.map(r=>r.start_ts));
+  if (last>0) document.getElementById("hd-updated").textContent = "마지막 기록 " + fmtDt(last);
+}
+
+/* ---------- 차트 (SVG 막대) ---------- */
+const tipEl = () => document.getElementById("tooltip");
+function showTip(evt, text) {
+  const el = tipEl();
+  el.textContent = text; el.style.display = "block";
+  el.style.left = (evt.clientX + 14) + "px";
+  el.style.top = (evt.clientY - 10) + "px";
+}
+function hideTip() { tipEl().style.display = "none"; }
+
+/* 최근 6개월 키 배열 */
+function last6() {
+  const out = [];
+  const d = new Date(); d.setDate(1);
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth()-i, 1);
+    out.push({ y:m.getFullYear(), m:m.getMonth(), label:(m.getMonth()+1)+"월",
+               a:m.getTime(), b:new Date(m.getFullYear(), m.getMonth()+1, 1).getTime() });
+  }
+  return out;
+}
+
+function drawBars(svgId, data, opts) {
+  // data: [{label, segs:[{v, color, name}]}] — 세그먼트 1개면 단일 막대
+  const svg = document.getElementById(svgId);
+  const W = svg.clientWidth || 460, H = svg.clientHeight || 180;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const padB = 22, padT = 14;
+  const max = Math.max(1e-9, ...data.map(d=>d.segs.reduce((s,x)=>s+x.v,0)));
+  const bw = Math.min(44, (W-20)/data.length*0.55);
+  const step = (W-20)/data.length;
+  let els = "";
+  data.forEach((d,i)=>{
+    const x = 10 + step*i + (step-bw)/2;
+    let y = H-padB;
+    const total = d.segs.reduce((s,x)=>s+x.v,0);
+    d.segs.forEach((s,si)=>{
+      if (s.v<=0) return;
+      const h = (H-padB-padT)*(s.v/max);
+      y -= h;
+      // 세그먼트 사이 2px 표면 간격, 상단 세그먼트만 4px 라운드
+      const isTop = (y <= padT+1) || si === d.segs.length-1 ||
+                    d.segs.slice(si+1).every(z=>z.v<=0);
+      const r = isTop ? 4 : 0;
+      els += `<path d="M${x},${y+h} L${x},${y+r} Q${x},${y} ${x+r},${y} L${x+bw-r},${y}
+        Q${x+bw},${y} ${x+bw},${y+r} L${x+bw},${y+h} Z"
+        fill="${s.color}" stroke="var(--card)" stroke-width="2"
+        data-tip="${d.label} ${s.name}: ${opts.fmt(s.v)}"></path>`;
+    });
+    if (total>0 && (i===data.length-1 || total===max)) {
+      els += `<text x="${x+bw/2}" y="${y-6}" fill="var(--sub)" font-size="11"
+        text-anchor="middle">${opts.fmt(total)}</text>`;
+    }
+    els += `<text x="${x+bw/2}" y="${H-6}" fill="var(--sub)" font-size="11"
+      text-anchor="middle">${d.label}</text>`;
+  });
+  els += `<line x1="10" y1="${H-padB}" x2="${W-10}" y2="${H-padB}" stroke="var(--line)"/>`;
+  svg.innerHTML = els;
+  svg.querySelectorAll("path[data-tip]").forEach(p=>{
+    p.addEventListener("mousemove", e=>showTip(e, p.getAttribute("data-tip")));
+    p.addEventListener("mouseleave", hideTip);
+  });
+}
+
+async function loadCharts() {
+  const months = last6();
+  const from = months[0].a;
+  const trips = await sb.from("trip").select("start_ts,distance_m")
+    .eq("device_id", DEV).gte("start_ts", from);
+  const charges = await sb.from("charge").select("start_ts,cost,type")
+    .eq("device_id", DEV).gte("start_ts", from);
+  const t = trips.data || [], c = charges.data || [];
+
+  drawBars("chart-km", months.map(m=>({
+    label: m.label,
+    segs: [{ name:"주행",
+      v: t.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b).reduce((s,r)=>s+r.distance_m,0)/1000,
+      color:"var(--accent)" }]
+  })), { fmt:v=>v.toLocaleString("ko-KR",{maximumFractionDigits:0})+" km" });
+
+  drawBars("chart-cost", months.map(m=>({
+    label: m.label,
+    segs: [
+      { name:"DC", color:"var(--dc)",
+        v: c.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b&&r.type==="DC").reduce((s,r)=>s+r.cost,0) },
+      { name:"AC", color:"var(--ac)",
+        v: c.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b&&r.type==="AC").reduce((s,r)=>s+r.cost,0) }
+    ]
+  })), { fmt:v=>Math.round(v).toLocaleString("ko-KR")+"원" });
+}
+
+/* ---------- 월별 목록 ---------- */
+function moveMonth(d) { curMonth.setMonth(curMonth.getMonth()+d); loadMonth(); }
+async function loadMonth() {
+  const [a, b] = monthRange(curMonth);
+  document.getElementById("month-title").textContent =
+    curMonth.getFullYear()+"년 "+(curMonth.getMonth()+1)+"월";
+
+  const trips = await sb.from("trip").select("*").eq("device_id", DEV)
+    .gte("start_ts", a).lt("start_ts", b).order("start_ts",{ascending:false});
+  const t = trips.data || [];
+  const km = t.reduce((s,r)=>s+r.distance_m,0)/1000;
+  const en = t.reduce((s,r)=>s+(r.energy_kwh||0),0);
+  document.getElementById("trips-sum").textContent =
+    `주행 ${t.length}건 · ${km.toFixed(1)} km` + (en>0.3 ? ` · 전비 ${(km/en).toFixed(1)} km/kWh` : "");
+  document.getElementById("trips-list").innerHTML = t.length ? t.map(r=>`
+    <div class="row clickable" onclick='openTrip(${JSON.stringify(r.polyline||"[]")}, "${fmtDt(r.start_ts)}")'>
+      <div class="grow">
+        <div>${fmtDt(r.start_ts)} <span class="dim">${Math.round((r.end_ts-r.start_ts)/60000)}분</span></div>
+        <div class="dim">${r.energy_kwh&&r.energy_kwh>0.05?(r.distance_m/1000/r.energy_kwh).toFixed(1)+" km/kWh":""}
+          ${r.soc_start!=null&&r.soc_end!=null?` · ${Math.round(r.soc_start)}→${Math.round(r.soc_end)}%`:""}</div>
+      </div>
+      <div class="big" style="color:var(--accent)">${(r.distance_m/1000).toFixed(1)} km</div>
+    </div>`).join("") : '<div class="empty">이 달의 주행 기록 없음</div>';
+
+  const charges = await sb.from("charge").select("*").eq("device_id", DEV)
+    .gte("start_ts", a).lt("start_ts", b).order("start_ts",{ascending:false});
+  const c = charges.data || [];
+  document.getElementById("charges-sum").textContent =
+    `충전 ${c.length}건 · ${fmtKwh(c.reduce((s,r)=>s+r.kwh,0))} · ${fmtWon(c.reduce((s,r)=>s+r.cost,0))}`;
+  document.getElementById("charges-list").innerHTML = c.length ? c.map(r=>`
+    <div class="row">
+      <span class="badge ${r.type}">${r.type}</span>
+      <div class="grow">
+        <div>${fmtDt(r.start_ts)} <span class="dim">${Math.round((r.end_ts-r.start_ts)/60000)}분</span></div>
+        <div class="dim">${r.station?`${r.station} · `:""}${r.soc_start!=null&&r.soc_end!=null?`${Math.round(r.soc_start)}→${Math.round(r.soc_end)}% · `:""}최대 ${r.max_kw} kW</div>
+      </div>
+      <div style="text-align:right">
+        <div class="big">${fmtKwh(r.kwh)}</div>
+        <div class="dim" style="color:var(--accent)">${fmtWon(r.cost)}</div>
+      </div>
+    </div>`).join("") : '<div class="empty">이 달의 충전 기록 없음</div>';
+}
+
+/* ---------- 지도 타일 (VWorld 국토교통부 베이스맵) ---------- */
+const VWORLD_KEY = ""; /* vworld.kr 인증키 입력 */
+function vworldLayer() {
+  /* midnight = 다크 지도 (앱과 통일). 밝은 일반 지도를 원하면 midnight → Base */
+  return L.tileLayer(
+    "https://api.vworld.kr/req/wmts/1.0.0/" + VWORLD_KEY + "/midnight/{z}/{y}/{x}.png",
+    { minZoom: 6, maxZoom: 19, attribution: "&copy; VWorld" });
+}
+
+/* ---------- 주차 위치 ---------- */
+let parkMap = null;
+async function loadParking() {
+  const res = await sb.from("parking").select("*").eq("device_id", DEV).maybeSingle();
+  const p = res.data;
+  if (!p) { document.getElementById("park-info").textContent = "주차 기록 없음"; return; }
+  parkMap = L.map("map").setView([p.lat, p.lon], 16);
+  vworldLayer().addTo(parkMap);
+  L.marker([p.lat, p.lon]).addTo(parkMap);
+  document.getElementById("park-info").textContent =
+    fmtDt(p.ts) + " 주차" + (p.soc!=null ? ` · 배터리 ${Math.round(p.soc)}%` : "") +
+    ` · ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+}
+
+/* ---------- 소모품 ---------- */
+async function loadConsumables() {
+  const res = await sb.from("consumable").select("*").eq("device_id", DEV).order("name");
+  const list = res.data || [];
+  document.getElementById("cons-list").innerHTML = list.length ? list.map(r=>{
+    let state = "";
+    if (r.remain_km != null) state = Math.round(r.remain_km).toLocaleString("ko-KR")+" km 남음";
+    if (r.remain_months != null)
+      state += (state?" · ":"") + r.remain_months.toFixed(1)+"개월 남음";
+    const danger = (r.remain_km!=null && r.remain_km<=0) || (r.remain_months!=null && r.remain_months<=0);
+    return `<div class="row"><div class="grow">${r.name}</div>
+      <div class="dim" style="${danger?'color:#FF7B7B':''}">${state||"-"}</div></div>`;
+  }).join("") : '<div class="empty">아직 업로드된 소모품 정보 없음</div>';
+}
+
+/* ---------- 주행 경로 모달 ---------- */
+let tripMap = null;
+function openTrip(polyJson, title) {
+  const pts = typeof polyJson === "string" ? JSON.parse(polyJson) : polyJson;
+  if (!pts || !pts.length) return;
+  document.getElementById("modal").style.display = "flex";
+  document.getElementById("modal-title").textContent = title + " 주행 경로";
+  setTimeout(()=>{
+    if (tripMap) { tripMap.remove(); tripMap = null; }
+    tripMap = L.map("tripmap");
+    vworldLayer().addTo(tripMap);
+    const line = L.polyline(pts, { color:"#E86A00", weight:5, opacity:.9 }).addTo(tripMap);
+    L.circleMarker(pts[0], {radius:7,color:"#3ECF6E",fillColor:"#3ECF6E",fillOpacity:1}).addTo(tripMap);
+    L.circleMarker(pts[pts.length-1], {radius:7,color:"#FF5C5C",fillColor:"#FF5C5C",fillOpacity:1}).addTo(tripMap);
+    tripMap.fitBounds(line.getBounds(), { padding:[24,24] });
+  }, 60);
+}
+function closeModal(){ document.getElementById("modal").style.display = "none"; }
+
+/* ---------- 시작 ---------- */
+/* 기본값 내장 (2026-08-07 사용자 결정, 개인용 전제) — 이 파일을 공개 장소에 올리지 말 것.
+   주소 뒤에 #setup 을 붙여 열면 설정 화면이 나옴 (차량 ID 변경용) */
+const DEFAULT_CFG = {
+  u: "",
+  k: "",
+  d: ""
+};
+window.addEventListener("load", ()=>{
+  const forceSetup = location.hash === "#setup";
+  const saved = (!forceSetup && loadHash()) || DEFAULT_CFG;
+  document.getElementById("in-url").value = saved.u || "";
+  document.getElementById("in-key").value = saved.k || "";
+  document.getElementById("in-dev").value = saved.d || "";
+  if (!forceSetup && saved.u && saved.k && saved.d) init(saved.u, saved.k, saved.d);
+});
+</script>
+</body>
+</html>

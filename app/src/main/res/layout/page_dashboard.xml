@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_vertical"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp"
+        android:paddingTop="10dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@+id/dash_state_line"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="대기 중"
+            android:textSize="18sp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/text_sub"
+            android:background="@drawable/bg_chip"
+            android:backgroundTint="@color/card"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="7dp"
+            android:paddingBottom="7dp"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:id="@+id/dash_warn_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="@drawable/bg_card"
+            android:padding="14dp"
+            android:layout_marginBottom="8dp"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/dash_warn_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="차량 데이터 확인 필요"
+                android:textSize="15sp"
+                android:textColor="@color/red" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:baselineAligned="false">
+
+            <!-- 왼쪽: 배터리 히어로 -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1.1"
+                android:orientation="vertical"
+                android:paddingTop="10dp">
+
+                <TextView
+                    android:id="@+id/dash_soc_caption"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="배터리"
+                    android:textSize="18sp"
+                    android:letterSpacing="0.25"
+                    android:textColor="@color/text_sub" />
+
+                <TextView
+                    android:id="@+id/dash_soc_big"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="--"
+                    android:textSize="104sp"
+                    android:fontFamily="sans-serif-light"
+                    android:textColor="@color/text"
+                    android:includeFontPadding="false"
+                    android:layout_marginTop="2dp" />
+
+                <ProgressBar
+                    android:id="@+id/dash_soc_bar"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginEnd="36dp"
+                    android:max="100"
+                    android:progressDrawable="@drawable/pb_soc" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="주행가능거리"
+                    android:textSize="18sp"
+                    android:letterSpacing="0.25"
+                    android:textColor="@color/text_sub"
+                    android:layout_marginTop="22dp" />
+
+                <TextView
+                    android:id="@+id/dash_range"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="-"
+                    android:textSize="46sp"
+                    android:fontFamily="sans-serif-light"
+                    android:textColor="@color/text"
+                    android:includeFontPadding="false"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <Space
+                android:layout_width="36dp"
+                android:layout_height="1dp" />
+
+            <!-- 오른쪽: 스탯 리스트 (박스 없이 헤어라인 구분) -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:paddingTop="4dp">
+
+                <LinearLayout style="@style/StatRow">
+                    <TextView style="@style/StatLabel" android:text="순간 전력"
+                        android:drawableStart="@drawable/ic_bolt" />
+                    <TextView android:id="@+id/dash_power" style="@style/StatValue" />
+                </LinearLayout>
+                <View style="@style/StatDivider" />
+
+                <LinearLayout style="@style/StatRow">
+                    <TextView style="@style/StatLabel" android:text="오늘 주행"
+                        android:drawableStart="@drawable/ic_tab_trip" />
+                    <TextView android:id="@+id/dash_today" style="@style/StatValue" />
+                </LinearLayout>
+                <View style="@style/StatDivider" />
+
+                <LinearLayout style="@style/StatRow">
+                    <TextView style="@style/StatLabel" android:text="오늘 전비"
+                        android:drawableStart="@drawable/ic_eco" />
+                    <TextView android:id="@+id/dash_eff" style="@style/StatValue" />
+                </LinearLayout>
+                <View style="@style/StatDivider" />
+
+                <LinearLayout style="@style/StatRow">
+                    <TextView style="@style/StatLabel" android:text="속도"
+                        android:drawableStart="@drawable/ic_tab_dash" />
+                    <TextView android:id="@+id/dash_speed" style="@style/StatValue" />
+                </LinearLayout>
+                <View style="@style/StatDivider" />
+
+                <LinearLayout style="@style/StatRow">
+                    <TextView style="@style/StatLabel" android:text="누적 주행"
+                        android:drawableStart="@drawable/ic_odo" />
+                    <TextView android:id="@+id/dash_total" style="@style/StatValue" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

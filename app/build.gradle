@@ -1,0 +1,39 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.p4log.car'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.p4log.car"
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+    lint {
+        // 사이드로드 개인용 앱: 배포용 검사 비활성화 항목
+        abortOnError false
+    }
+}
+
+dependencies {
+    // 의도적으로 외부 라이브러리 0개 (플랫폼 API만 사용) — 빌드 실패 요인 최소화
+}

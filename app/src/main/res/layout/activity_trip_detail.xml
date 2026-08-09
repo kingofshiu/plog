@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingEnd="16dp">
+        <TextView
+            android:id="@+id/td_back"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:text="←"
+            android:textSize="24sp"
+            android:textColor="@color/text" />
+        <TextView
+            android:id="@+id/td_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="20sp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/text" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:paddingStart="32dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="16dp"
+        android:baselineAligned="false">
+
+        <!-- 좌측: 통계가 주인공 (2열 그리드) -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.35"
+            android:orientation="vertical"
+            android:gravity="center_vertical"
+            android:paddingEnd="30dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="거리"
+                android:textSize="18sp"
+                android:letterSpacing="0.25"
+                android:textColor="@color/text_sub" />
+
+            <TextView
+                android:id="@+id/td_km"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textSize="76sp"
+                android:fontFamily="sans-serif-light"
+                android:textColor="@color/text"
+                android:includeFontPadding="false"
+                android:layout_marginTop="2dp"
+                android:layout_marginBottom="22dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+                <LinearLayout style="@style/TdCell">
+                    <TextView style="@style/TdLabel" android:text="시간" />
+                    <TextView android:id="@+id/td_time" style="@style/TdValue" />
+                </LinearLayout>
+                <LinearLayout style="@style/TdCell">
+                    <TextView style="@style/TdLabel" android:text="전비" />
+                    <TextView android:id="@+id/td_eff" style="@style/TdValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="20dp"
+                android:baselineAligned="false">
+                <LinearLayout style="@style/TdCell">
+                    <TextView style="@style/TdLabel" android:text="사용 전력" />
+                    <TextView android:id="@+id/td_energy" style="@style/TdValue" />
+                </LinearLayout>
+                <LinearLayout style="@style/TdCell">
+                    <TextView style="@style/TdLabel" android:text="배터리" />
+                    <TextView android:id="@+id/td_soc" style="@style/TdValue"
+                        android:textSize="29sp" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="20dp"
+                android:baselineAligned="false">
+                <LinearLayout style="@style/TdCell">
+                    <TextView style="@style/TdLabel" android:text="평균 속도" />
+                    <TextView android:id="@+id/td_speed_avg" style="@style/TdValue" />
+                </LinearLayout>
+                <LinearLayout style="@style/TdCell">
+                    <TextView style="@style/TdLabel" android:text="최고 속도" />
+                    <TextView android:id="@+id/td_speed_max" style="@style/TdValue" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 우측: 작은 지도 + 전비 비교 그래프 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:background="@drawable/bg_card">
+                <WebView
+                    android:id="@+id/td_web"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="전비 비교 — 최근 주행 vs 이번 주행"
+                android:textSize="18sp"
+                android:letterSpacing="0.1"
+                android:textColor="@color/text_sub"
+                android:layout_marginTop="16dp" />
+
+            <com.p4log.car.TripEffChartView
+                android:id="@+id/td_chart"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="8dp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

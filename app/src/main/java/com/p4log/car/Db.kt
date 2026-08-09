@@ -1,0 +1,427 @@
+package com.p4log.car
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.Cursor
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+
+/** 로컬 저장소 (SQLite, 외부 라이브러리 없음). v2: 충전소 프로필 + charge.station (2026-08-09) */
+class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log.db", null, 2) {
+
+    override fun onCreate(db: SQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE trip (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "start_ts INTEGER NOT NULL," +
+                "end_ts INTEGER NOT NULL," +
+                "distance_m REAL NOT NULL," +
+                "energy_kwh REAL," +
+                "soc_start REAL," +
+                "soc_end REAL," +
+                "avg_kmh REAL NOT NULL DEFAULT 0," +
+                "max_kmh REAL NOT NULL DEFAULT 0," +
+                "start_lat REAL, start_lon REAL," +
+                "end_lat REAL, end_lon REAL," +
+                "polyline TEXT NOT NULL DEFAULT '[]'," +
+                "synced INTEGER NOT NULL DEFAULT 0)"
+        )
+        db.execSQL(
+            "CREATE TABLE charge (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "start_ts INTEGER NOT NULL," +
+                "end_ts INTEGER NOT NULL," +
+                "kwh REAL NOT NULL," +
+                "cost REAL NOT NULL," +
+                "soc_start REAL," +
+                "soc_end REAL," +
+                "max_kw REAL NOT NULL DEFAULT 0," +
+                "type TEXT NOT NULL DEFAULT 'AC'," +
+                "profile TEXT NOT NULL DEFAULT '[]'," +
+                "station TEXT," +
+                "st_lat REAL, st_lon REAL," +
+                "synced INTEGER NOT NULL DEFAULT 0)"
+        )
+        db.execSQL(CREATE_STATION_PROFILE)
+        db.execSQL(
+            "CREATE TABLE consumable (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "name TEXT NOT NULL," +
+                "cycle_km INTEGER NOT NULL DEFAULT 0," +
+                "cycle_months INTEGER NOT NULL DEFAULT 0," +
+                "base_km REAL NOT NULL DEFAULT 0," +
+                "base_ts INTEGER NOT NULL DEFAULT 0)"
+        )
+        db.execSQL(
+            "CREATE TABLE parking (" +
+                "id INTEGER PRIMARY KEY CHECK (id = 1)," +
+                "ts INTEGER NOT NULL," +
+                "lat REAL NOT NULL," +
+                "lon REAL NOT NULL," +
+                "soc REAL)"
+        )
+        // 기본 소모품 (주기는 설정에서 수정 가능)
+        val now = System.currentTimeMillis()
+        insertConsumableInternal(db, "타이어", 45000, 0, 0.0, now)
+        insertConsumableInternal(db, "브레이크 패드", 60000, 0, 0.0, now)
+        insertConsumableInternal(db, "에어컨 필터", 15000, 12, 0.0, now)
+        insertConsumableInternal(db, "와이퍼", 0, 12, 0.0, now)
+        insertConsumableInternal(db, "감속기 오일", 60000, 0, 0.0, now)
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 2) {
+            // v1 → v2: 충전소 자동 인식 기능 (기존 데이터 보존)
+            db.execSQL("ALTER TABLE charge ADD COLUMN station TEXT")
+            db.execSQL("ALTER TABLE charge ADD COLUMN st_lat REAL")
+            db.execSQL("ALTER TABLE charge ADD COLUMN st_lon REAL")
+            db.execSQL(CREATE_STATION_PROFILE)
+        }
+    }
+
+    private fun insertConsumableInternal(
+        db: SQLiteDatabase, name: String, cycleKm: Long, cycleMonths: Long, baseKm: Double, baseTs: Long
+    ) {
+        val cv = ContentValues()
+        cv.put("name", name)
+        cv.put("cycle_km", cycleKm)
+        cv.put("cycle_months", cycleMonths)
+        cv.put("base_km", baseKm)
+        cv.put("base_ts", baseTs)
+        db.insert("consumable", null, cv)
+    }
+
+    // ---------- Trip ----------
+
+    fun insertTrip(t: Trip): Long {
+        val cv = ContentValues()
+        cv.put("start_ts", t.startTs)
+        cv.put("end_ts", t.endTs)
+        cv.put("distance_m", t.distanceM)
+        if (t.energyKwh != null) cv.put("energy_kwh", t.energyKwh) else cv.putNull("energy_kwh")
+        if (t.socStart != null) cv.put("soc_start", t.socStart) else cv.putNull("soc_start")
+        if (t.socEnd != null) cv.put("soc_end", t.socEnd) else cv.putNull("soc_end")
+        cv.put("avg_kmh", t.avgKmh)
+        cv.put("max_kmh", t.maxKmh)
+        if (t.startLat != null) cv.put("start_lat", t.startLat) else cv.putNull("start_lat")
+        if (t.startLon != null) cv.put("start_lon", t.startLon) else cv.putNull("start_lon")
+        if (t.endLat != null) cv.put("end_lat", t.endLat) else cv.putNull("end_lat")
+        if (t.endLon != null) cv.put("end_lon", t.endLon) else cv.putNull("end_lon")
+        cv.put("polyline", t.polyline)
+        cv.put("synced", 0)
+        return writableDatabase.insert("trip", null, cv)
+    }
+
+    private fun readTrip(c: Cursor): Trip = Trip(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        startTs = c.getLong(c.getColumnIndexOrThrow("start_ts")),
+        endTs = c.getLong(c.getColumnIndexOrThrow("end_ts")),
+        distanceM = c.getDouble(c.getColumnIndexOrThrow("distance_m")),
+        energyKwh = if (c.isNull(c.getColumnIndexOrThrow("energy_kwh"))) null
+                    else c.getDouble(c.getColumnIndexOrThrow("energy_kwh")),
+        socStart = if (c.isNull(c.getColumnIndexOrThrow("soc_start"))) null
+                   else c.getFloat(c.getColumnIndexOrThrow("soc_start")),
+        socEnd = if (c.isNull(c.getColumnIndexOrThrow("soc_end"))) null
+                 else c.getFloat(c.getColumnIndexOrThrow("soc_end")),
+        avgKmh = c.getDouble(c.getColumnIndexOrThrow("avg_kmh")),
+        maxKmh = c.getDouble(c.getColumnIndexOrThrow("max_kmh")),
+        startLat = if (c.isNull(c.getColumnIndexOrThrow("start_lat"))) null
+                   else c.getDouble(c.getColumnIndexOrThrow("start_lat")),
+        startLon = if (c.isNull(c.getColumnIndexOrThrow("start_lon"))) null
+                   else c.getDouble(c.getColumnIndexOrThrow("start_lon")),
+        endLat = if (c.isNull(c.getColumnIndexOrThrow("end_lat"))) null
+                 else c.getDouble(c.getColumnIndexOrThrow("end_lat")),
+        endLon = if (c.isNull(c.getColumnIndexOrThrow("end_lon"))) null
+                 else c.getDouble(c.getColumnIndexOrThrow("end_lon")),
+        polyline = c.getString(c.getColumnIndexOrThrow("polyline")),
+        synced = c.getInt(c.getColumnIndexOrThrow("synced")) == 1
+    )
+
+    /** 기간 내 주행 목록 (최신순) */
+    fun tripsBetween(fromTs: Long, toTs: Long): List<Trip> {
+        val list = ArrayList<Trip>()
+        val c = readableDatabase.rawQuery(
+            "SELECT * FROM trip WHERE start_ts >= ? AND start_ts < ? ORDER BY start_ts DESC",
+            arrayOf(fromTs.toString(), toTs.toString())
+        )
+        c.use { while (it.moveToNext()) list.add(readTrip(it)) }
+        return list
+    }
+
+    fun tripById(id: Long): Trip? {
+        val c = readableDatabase.rawQuery("SELECT * FROM trip WHERE id = ?", arrayOf(id.toString()))
+        c.use { return if (it.moveToFirst()) readTrip(it) else null }
+    }
+
+    fun unsyncedTrips(): List<Trip> {
+        val list = ArrayList<Trip>()
+        val c = readableDatabase.rawQuery(
+            "SELECT * FROM trip WHERE synced = 0 ORDER BY start_ts ASC LIMIT 50", null
+        )
+        c.use { while (it.moveToNext()) list.add(readTrip(it)) }
+        return list
+    }
+
+    fun markTripSynced(id: Long) {
+        val cv = ContentValues(); cv.put("synced", 1)
+        writableDatabase.update("trip", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    /** 최근 주행의 전비 목록 (시간순, 전비 계산 가능한 것만): Pair(주행 id, km/kWh) */
+    fun recentTripEffs(limit: Int): List<Pair<Long, Double>> {
+        val c = readableDatabase.rawQuery(
+            "SELECT id, distance_m, energy_kwh FROM trip " +
+                "WHERE energy_kwh IS NOT NULL AND energy_kwh > 0.05 " +
+                "ORDER BY start_ts DESC LIMIT ?",
+            arrayOf(limit.toString())
+        )
+        val list = ArrayList<Pair<Long, Double>>()
+        c.use {
+            while (it.moveToNext()) {
+                val km = it.getDouble(1) / 1000.0
+                val kwh = it.getDouble(2)
+                list.add(it.getLong(0) to km / kwh)
+            }
+        }
+        return list.reversed()
+    }
+
+    /** [fromTs, toTs) 주행 합계: [건수, 총거리m, 총에너지kWh] */
+    fun tripTotals(fromTs: Long, toTs: Long): DoubleArray {
+        val c = readableDatabase.rawQuery(
+            "SELECT COUNT(*), IFNULL(SUM(distance_m),0), IFNULL(SUM(energy_kwh),0) " +
+                "FROM trip WHERE start_ts >= ? AND start_ts < ?",
+            arrayOf(fromTs.toString(), toTs.toString())
+        )
+        c.use {
+            return if (it.moveToFirst()) doubleArrayOf(it.getDouble(0), it.getDouble(1), it.getDouble(2))
+            else doubleArrayOf(0.0, 0.0, 0.0)
+        }
+    }
+
+    // ---------- Charge ----------
+
+    fun insertCharge(s: ChargeSession): Long {
+        val cv = ContentValues()
+        cv.put("start_ts", s.startTs)
+        cv.put("end_ts", s.endTs)
+        cv.put("kwh", s.kwh)
+        cv.put("cost", s.cost)
+        if (s.socStart != null) cv.put("soc_start", s.socStart) else cv.putNull("soc_start")
+        if (s.socEnd != null) cv.put("soc_end", s.socEnd) else cv.putNull("soc_end")
+        cv.put("max_kw", s.maxKw)
+        cv.put("type", s.type)
+        cv.put("profile", s.profile)
+        if (s.station != null) cv.put("station", s.station) else cv.putNull("station")
+        if (s.stLat != null) cv.put("st_lat", s.stLat) else cv.putNull("st_lat")
+        if (s.stLon != null) cv.put("st_lon", s.stLon) else cv.putNull("st_lon")
+        cv.put("synced", 0)
+        return writableDatabase.insert("charge", null, cv)
+    }
+
+    private fun readCharge(c: Cursor): ChargeSession = ChargeSession(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        startTs = c.getLong(c.getColumnIndexOrThrow("start_ts")),
+        endTs = c.getLong(c.getColumnIndexOrThrow("end_ts")),
+        kwh = c.getDouble(c.getColumnIndexOrThrow("kwh")),
+        cost = c.getDouble(c.getColumnIndexOrThrow("cost")),
+        socStart = if (c.isNull(c.getColumnIndexOrThrow("soc_start"))) null
+                   else c.getFloat(c.getColumnIndexOrThrow("soc_start")),
+        socEnd = if (c.isNull(c.getColumnIndexOrThrow("soc_end"))) null
+                 else c.getFloat(c.getColumnIndexOrThrow("soc_end")),
+        maxKw = c.getDouble(c.getColumnIndexOrThrow("max_kw")),
+        type = c.getString(c.getColumnIndexOrThrow("type")),
+        profile = c.getString(c.getColumnIndexOrThrow("profile")),
+        station = if (c.isNull(c.getColumnIndexOrThrow("station"))) null
+                  else c.getString(c.getColumnIndexOrThrow("station")),
+        stLat = if (c.isNull(c.getColumnIndexOrThrow("st_lat"))) null
+                else c.getDouble(c.getColumnIndexOrThrow("st_lat")),
+        stLon = if (c.isNull(c.getColumnIndexOrThrow("st_lon"))) null
+                else c.getDouble(c.getColumnIndexOrThrow("st_lon")),
+        synced = c.getInt(c.getColumnIndexOrThrow("synced")) == 1
+    )
+
+    fun chargeById(id: Long): ChargeSession? {
+        val c = readableDatabase.rawQuery("SELECT * FROM charge WHERE id = ?", arrayOf(id.toString()))
+        c.use { return if (it.moveToFirst()) readCharge(it) else null }
+    }
+
+    fun chargesBetween(fromTs: Long, toTs: Long): List<ChargeSession> {
+        val list = ArrayList<ChargeSession>()
+        val c = readableDatabase.rawQuery(
+            "SELECT * FROM charge WHERE start_ts >= ? AND start_ts < ? ORDER BY start_ts DESC",
+            arrayOf(fromTs.toString(), toTs.toString())
+        )
+        c.use { while (it.moveToNext()) list.add(readCharge(it)) }
+        return list
+    }
+
+    fun unsyncedCharges(): List<ChargeSession> {
+        val list = ArrayList<ChargeSession>()
+        val c = readableDatabase.rawQuery(
+            "SELECT * FROM charge WHERE synced = 0 ORDER BY start_ts ASC LIMIT 50", null
+        )
+        c.use { while (it.moveToNext()) list.add(readCharge(it)) }
+        return list
+    }
+
+    fun markChargeSynced(id: Long) {
+        val cv = ContentValues(); cv.put("synced", 1)
+        writableDatabase.update("charge", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    /** [fromTs, toTs) 충전 합계: [건수, 총kWh, 총비용] */
+    fun chargeTotals(fromTs: Long, toTs: Long): DoubleArray {
+        val c = readableDatabase.rawQuery(
+            "SELECT COUNT(*), IFNULL(SUM(kwh),0), IFNULL(SUM(cost),0) " +
+                "FROM charge WHERE start_ts >= ? AND start_ts < ?",
+            arrayOf(fromTs.toString(), toTs.toString())
+        )
+        c.use {
+            return if (it.moveToFirst()) doubleArrayOf(it.getDouble(0), it.getDouble(1), it.getDouble(2))
+            else doubleArrayOf(0.0, 0.0, 0.0)
+        }
+    }
+
+    // ---------- Consumable ----------
+
+    fun consumables(): List<Consumable> {
+        val list = ArrayList<Consumable>()
+        val c = readableDatabase.rawQuery("SELECT * FROM consumable ORDER BY id ASC", null)
+        c.use {
+            while (it.moveToNext()) {
+                list.add(
+                    Consumable(
+                        id = it.getLong(it.getColumnIndexOrThrow("id")),
+                        name = it.getString(it.getColumnIndexOrThrow("name")),
+                        cycleKm = it.getLong(it.getColumnIndexOrThrow("cycle_km")),
+                        cycleMonths = it.getLong(it.getColumnIndexOrThrow("cycle_months")),
+                        baseKm = it.getDouble(it.getColumnIndexOrThrow("base_km")),
+                        baseTs = it.getLong(it.getColumnIndexOrThrow("base_ts"))
+                    )
+                )
+            }
+        }
+        return list
+    }
+
+    /** 교체 처리: 기준점을 현재 누적km/현재 시각으로 리셋 */
+    fun resetConsumable(id: Long, currentTotalKm: Double) {
+        val cv = ContentValues()
+        cv.put("base_km", currentTotalKm)
+        cv.put("base_ts", System.currentTimeMillis())
+        writableDatabase.update("consumable", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    /** '이미 사용한 km' 수동 보정: base_km = 현재누적 - 사용량 */
+    fun setConsumableUsedKm(id: Long, currentTotalKm: Double, usedKm: Double) {
+        val cv = ContentValues()
+        cv.put("base_km", currentTotalKm - usedKm)
+        writableDatabase.update("consumable", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    fun updateConsumableCycle(id: Long, cycleKm: Long, cycleMonths: Long) {
+        val cv = ContentValues()
+        cv.put("cycle_km", cycleKm)
+        cv.put("cycle_months", cycleMonths)
+        writableDatabase.update("consumable", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    // ---------- 충전소 프로필 ----------
+
+    private fun readProfile(c: Cursor): StationProfile = StationProfile(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        lat = c.getDouble(c.getColumnIndexOrThrow("lat")),
+        lon = c.getDouble(c.getColumnIndexOrThrow("lon")),
+        name = c.getString(c.getColumnIndexOrThrow("name")),
+        operator = if (c.isNull(c.getColumnIndexOrThrow("operator"))) null
+                   else c.getString(c.getColumnIndexOrThrow("operator")),
+        rate = if (c.isNull(c.getColumnIndexOrThrow("rate"))) null
+               else c.getDouble(c.getColumnIndexOrThrow("rate")),
+        updatedTs = c.getLong(c.getColumnIndexOrThrow("updated_ts"))
+    )
+
+    /** 반경 radiusM 내에서 가장 가까운 충전소 프로필 (없으면 null) */
+    fun nearestStationProfile(lat: Double, lon: Double, radiusM: Double): StationProfile? {
+        val c = readableDatabase.rawQuery("SELECT * FROM station_profile", null)
+        var best: StationProfile? = null
+        var bestD = radiusM
+        val out = FloatArray(1)
+        c.use {
+            while (it.moveToNext()) {
+                val p = readProfile(it)
+                android.location.Location.distanceBetween(lat, lon, p.lat, p.lon, out)
+                if (out[0] <= bestD) { bestD = out[0].toDouble(); best = p }
+            }
+        }
+        return best
+    }
+
+    /** 60m 내 기존 프로필이 있으면 갱신, 없으면 생성. rate가 null이면 기존 rate 유지 */
+    fun upsertStationProfile(lat: Double, lon: Double, name: String, operator: String?, rate: Double?) {
+        val existing = nearestStationProfile(lat, lon, 60.0)
+        val cv = ContentValues()
+        cv.put("name", name)
+        if (operator != null) cv.put("operator", operator)
+        if (rate != null) cv.put("rate", rate)
+        cv.put("updated_ts", System.currentTimeMillis())
+        if (existing != null) {
+            writableDatabase.update("station_profile", cv, "id = ?", arrayOf(existing.id.toString()))
+        } else {
+            cv.put("lat", lat)
+            cv.put("lon", lon)
+            writableDatabase.insert("station_profile", null, cv)
+        }
+    }
+
+    /** 충전 기록 단가 수정: 요금 재계산 + 재업로드 대상으로 표시 */
+    fun updateChargeRate(id: Long, kwh: Double, rate: Double) {
+        val cv = ContentValues()
+        cv.put("cost", Math.round(kwh * rate).toDouble())
+        cv.put("synced", 0)
+        writableDatabase.update("charge", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    // ---------- Parking ----------
+
+    fun saveParking(p: ParkingInfo) {
+        val cv = ContentValues()
+        cv.put("id", 1)
+        cv.put("ts", p.ts)
+        cv.put("lat", p.lat)
+        cv.put("lon", p.lon)
+        if (p.socPct != null) cv.put("soc", p.socPct) else cv.putNull("soc")
+        writableDatabase.insertWithOnConflict("parking", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    fun parking(): ParkingInfo? {
+        val c = readableDatabase.rawQuery("SELECT * FROM parking WHERE id = 1", null)
+        c.use {
+            return if (it.moveToFirst()) ParkingInfo(
+                ts = it.getLong(it.getColumnIndexOrThrow("ts")),
+                lat = it.getDouble(it.getColumnIndexOrThrow("lat")),
+                lon = it.getDouble(it.getColumnIndexOrThrow("lon")),
+                socPct = if (it.isNull(it.getColumnIndexOrThrow("soc"))) null
+                         else it.getFloat(it.getColumnIndexOrThrow("soc"))
+            ) else null
+        }
+    }
+
+    companion object {
+        private const val CREATE_STATION_PROFILE =
+            "CREATE TABLE station_profile (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "lat REAL NOT NULL," +
+                "lon REAL NOT NULL," +
+                "name TEXT NOT NULL," +
+                "operator TEXT," +
+                "rate REAL," +
+                "updated_ts INTEGER NOT NULL DEFAULT 0)"
+
+        @Volatile private var instance: Db? = null
+        fun get(context: Context): Db =
+            instance ?: synchronized(this) {
+                instance ?: Db(context.applicationContext).also { instance = it }
+            }
+    }
+}

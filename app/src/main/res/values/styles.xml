@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.P4Log" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+
+    <!-- 대시보드 통계 셀 -->
+    <style name="DashCell">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:background">@drawable/bg_card</item>
+        <item name="android:padding">16dp</item>
+    </style>
+
+    <style name="DashLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/text_sub</item>
+    </style>
+
+    <style name="DashValue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:text">-</item>
+    </style>
+
+    <!-- 대시보드 오른쪽 스탯 리스트 (박스 없는 미니멀 행) -->
+    <style name="StatRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingTop">13dp</item>
+        <item name="android:paddingBottom">13dp</item>
+    </style>
+
+    <style name="StatLabel">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/text_sub</item>
+        <item name="android:drawableTint">#C9C9CE</item>
+        <item name="android:drawablePadding">10dp</item>
+        <item name="android:gravity">center_vertical</item>
+    </style>
+
+    <style name="StatValue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:fontFamily">sans-serif-light</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:text">-</item>
+    </style>
+
+    <style name="StatDivider">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">@color/card_line</item>
+    </style>
+
+    <!-- 주행 상세 통계 그리드 셀 -->
+    <style name="TdCell">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
+    <style name="TdLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:letterSpacing">0.15</item>
+        <item name="android:textColor">@color/text_sub</item>
+    </style>
+
+    <style name="TdValue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">34sp</item>
+        <item name="android:fontFamily">sans-serif-light</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:text">-</item>
+    </style>
+
+    <!-- 목록 상단 월 이동 버튼 (ImageButton, ◀▶ 텍스트는 차량 폰트에서 빈 네모로 나와 아이콘으로 교체) -->
+    <style name="MonthNavButton">
+        <item name="android:layout_width">56dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:background">@drawable/bg_button_dim</item>
+        <item name="android:scaleType">center</item>
+        <item name="android:tint">@color/text</item>
+    </style>
+
+    <!-- 설정 입력 라벨/필드 -->
+    <style name="SetLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textColor">@color/text_sub</item>
+        <item name="android:layout_marginTop">12dp</item>
+    </style>
+
+    <style name="SetEdit">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">19sp</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="android:textColorHint">#C9C9CE</item>
+        <item name="android:backgroundTint">@color/card_line</item>
+    </style>
+</resources>

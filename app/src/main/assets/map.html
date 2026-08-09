@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html, body { margin:0; padding:0; height:100%; background:#1A1B1E; }
+  #map { height:100%; border-radius:14px; }
+  #offline {
+    display:none; color:#9A9AA0; font-family:sans-serif; text-align:center;
+    padding-top:40px; font-size:15px;
+  }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="offline">지도를 불러오지 못했습니다<br>인터넷 연결 또는 VWorld 서버 상태를 확인하세요</div>
+<script>
+  var map = null;
+
+  function initMap() {
+    if (typeof L === "undefined") {
+      document.getElementById("map").style.display = "none";
+      document.getElementById("offline").style.display = "block";
+      return false;
+    }
+    if (map) return true;
+    map = L.map("map", { zoomControl: true });
+    /* VWorld(국토교통부) 다크(midnight) 지도 — 앱 다크 테마와 통일, POI 노이즈 적음.
+       폴백 없음 — 타일이 하나도 안 오면 오류 안내 표시 */
+    var VWORLD_KEY = ""; /* vworld.kr에서 발급받은 인증키 입력 */
+    var layer = L.tileLayer(
+      "https://api.vworld.kr/req/wmts/1.0.0/" + VWORLD_KEY + "/midnight/{z}/{y}/{x}.png", {
+      minZoom: 6,
+      maxZoom: 19,
+      attribution: "&copy; VWorld"
+    });
+    var okTiles = 0, badTiles = 0;
+    layer.on("tileload", function () { okTiles++; });
+    layer.on("tileerror", function () {
+      badTiles++;
+      if (okTiles === 0 && badTiles >= 4) {
+        document.getElementById("map").style.display = "none";
+        document.getElementById("offline").style.display = "block";
+      }
+    });
+    layer.addTo(map);
+    return true;
+  }
+
+  /* 주행 경로: points = [[lat,lon],...] */
+  function showTrip(points) {
+    if (!initMap()) return;
+    if (!points || points.length === 0) {
+      map.setView([35.1796, 129.0756], 11); /* 기본: 부산 */
+      return;
+    }
+    var line = L.polyline(points, { color: "#FF7A1A", weight: 5, opacity: 0.9 }).addTo(map);
+    L.circleMarker(points[0], { radius: 7, color: "#3ECF6E", fillColor: "#3ECF6E",
+      fillOpacity: 1 }).addTo(map).bindPopup("출발");
+    L.circleMarker(points[points.length - 1], { radius: 7, color: "#FF5C5C",
+      fillColor: "#FF5C5C", fillOpacity: 1 }).addTo(map).bindPopup("도착");
+    map.fitBounds(line.getBounds(), { padding: [30, 30] });
+  }
+
+  /* 단일 지점 (주차 위치) */
+  function showPoint(lat, lon) {
+    if (!initMap()) return;
+    L.marker([lat, lon]).addTo(map);
+    map.setView([lat, lon], 17);
+  }
+</script>
+</body>
+</html>
