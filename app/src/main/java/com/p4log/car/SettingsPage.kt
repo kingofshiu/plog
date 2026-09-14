@@ -14,6 +14,8 @@ class SettingsPage(private val host: AppHost, root: View) : PageController {
 
     private val etCapacity: EditText = root.findViewById(R.id.set_capacity)
     private val etOdo: EditText = root.findViewById(R.id.set_odo)
+    private val etVworld: EditText = root.findViewById(R.id.set_vworld)
+    private val etDataGo: EditText = root.findViewById(R.id.set_datago)
     private val etSbUrl: EditText = root.findViewById(R.id.set_sb_url)
     private val etSbKey: EditText = root.findViewById(R.id.set_sb_key)
     private val tvKeyToggle: TextView = root.findViewById(R.id.set_sb_key_toggle)
@@ -39,6 +41,8 @@ class SettingsPage(private val host: AppHost, root: View) : PageController {
     override fun onShow() {
         etCapacity.setText(Prefs.capacityKwh(activity).toString())
         etOdo.setText(Math.round(Prefs.totalKm(activity)).toString())
+        etVworld.setText(Prefs.vworldKey(activity))
+        etDataGo.setText(Prefs.dataGoKey(activity))
         etSbUrl.setText(Prefs.supabaseUrl(activity))
         etSbKey.setText(Prefs.supabaseKey(activity))
         etDeviceId.setText(Prefs.deviceId(activity))
@@ -54,6 +58,10 @@ class SettingsPage(private val host: AppHost, root: View) : PageController {
         if (odo != null && odo >= 0) {
             Prefs.setOdoOffsetKm(activity, odo - Prefs.lifetimeKm(activity))
         }
+
+        Prefs.setVworldKey(activity, etVworld.text.toString())
+        Prefs.setDataGoKey(activity, etDataGo.text.toString())
+        EvStations.init(activity)
 
         Prefs.setSupabase(
             activity,

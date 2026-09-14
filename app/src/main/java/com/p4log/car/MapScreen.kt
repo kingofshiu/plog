@@ -25,6 +25,6 @@ object MapScreen {
                 }
             }
         })
-        web.loadUrl("file:///android_asset/map.html")
+        web.loadUrl(Prefs.mapUrl(web.context))
     }
 }

@@ -228,7 +228,7 @@ class DashboardPage(private val host: AppHost, root: View) : PageController {
             liveMap.setWebViewClient(object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) { mapLoaded = true }
             })
-            liveMap.loadUrl("file:///android_asset/map.html")
+            liveMap.loadUrl(Prefs.mapUrl(liveMap.context))
         }
         main.removeCallbacks(liveMapTick)
         main.postDelayed(liveMapTick, 600)

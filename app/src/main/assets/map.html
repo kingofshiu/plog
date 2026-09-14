@@ -43,7 +43,9 @@
     map = L.map("map", { zoomControl: true });
     /* VWorld(국토교통부) 다크(midnight) 지도 — 앱 다크 테마와 통일, POI 노이즈 적음.
        폴백 없음 — 타일이 하나도 안 오면 오류 안내 표시 */
-    var VWORLD_KEY = ""; /* vworld.kr에서 발급받은 인증키 입력 */
+    /* 키는 앱이 map.html?k=... 로 넘긴다 (설정 화면 입력값, 2026-09-15). 파일 안에는 키가 없다 */
+    var VWORLD_KEY = (function () { var m = /[?&]k=([^&#]*)/.exec(location.search); return m ? decodeURIComponent(m[1]) : ""; })();
+    if (!VWORLD_KEY) { document.getElementById("offline").innerHTML = "지도 키가 없습니다<br>설정 탭에서 VWorld 인증키를 입력하세요"; }
     var layer = L.tileLayer(
       "https://api.vworld.kr/req/wmts/1.0.0/" + VWORLD_KEY + "/midnight/{z}/{y}/{x}.png", {
       minZoom: 6,

@@ -54,7 +54,7 @@ object TripsScreen {
                 pendingPolyline = null
             }
         })
-        web.loadUrl("file:///android_asset/map.html")
+        web.loadUrl(Prefs.mapUrl(web.context))
 
         // 숫자 카운트업 (사용자 2026-09-08: 기간·주행이 바뀔 때 숫자가 굴러가게)
         fun tv(id: Int) = root.findViewById<TextView>(id)

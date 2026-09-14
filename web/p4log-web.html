@@ -164,6 +164,8 @@
   <input id="in-key" placeholder="sb_publishable_...">
   <label>차량 ID (차량 앱 설정과 동일하게)</label>
   <input id="in-dev" placeholder="p4-123456">
+  <label>VWorld 지도 인증키 (선택 — 없으면 지도만 안 보임)</label>
+  <input id="in-vw" placeholder="vworld.kr에서 발급">
   <button onclick="connect()">불러오기</button>
   <div id="err"></div>
   <p style="color:var(--muted);font-size:12.5px;margin-top:14px;line-height:1.6">
@@ -365,13 +367,14 @@ function connect() {
   const url = document.getElementById("in-url").value.trim().replace(/\/+$/,"");
   const key = document.getElementById("in-key").value.trim();
   const dev = document.getElementById("in-dev").value.trim();
-  if (!url || !key || !dev) { document.getElementById("err").textContent = "세 칸 모두 입력하세요"; return; }
-  location.hash = encodeURIComponent(JSON.stringify({u:url,k:key,d:dev}));
-  init(url, key, dev);
+  const vw = document.getElementById("in-vw").value.trim();
+  if (!url || !key || !dev) { document.getElementById("err").textContent = "URL · 키 · 차량 ID를 입력하세요"; return; }
+  location.hash = encodeURIComponent(JSON.stringify({u:url,k:key,d:dev,v:vw}));
+  init(url, key, dev, vw);
 }
-async function init(url, key, dev) {
+async function init(url, key, dev, vw) {
   sb = window.supabase.createClient(url, key);
-  DEV = dev; BASEURL = url;
+  DEV = dev; BASEURL = url; VWORLD_KEY = vw || "";
   const test = await sb.from("trip").select("client_id").limit(1);
   if (test.error) { document.getElementById("err").textContent = "연결 실패: " + test.error.message; return; }
   document.getElementById("setup").style.display = "none";
@@ -705,7 +708,7 @@ function loadCharts() {
 }
 
 /* ---------- 지도 타일 (VWorld 국토교통부 베이스맵, 다크) ---------- */
-const VWORLD_KEY = ""; /* vworld.kr 인증키 입력 */
+let VWORLD_KEY = "";   /* 설정 화면 입력값 (해시의 v). 파일 안에 키를 두지 않는다 (2026-09-15) */
 function vworldLayer() {
   return L.tileLayer("https://api.vworld.kr/req/wmts/1.0.0/" + VWORLD_KEY + "/midnight/{z}/{y}/{x}.png",
     { minZoom: 6, maxZoom: 19, attribution: "&copy; VWorld" });
@@ -1018,7 +1021,8 @@ function openChargeDetail(clientId) {
 const DEFAULT_CFG = {
   u: "",   // Supabase Project URL (비워 두면 첫 화면에서 입력)
   k: "",   // anon public 키
-  d: ""     // 차량 ID (차량 앱 설정 화면의 값)
+  d: "",   // 차량 ID (차량 앱 설정 화면의 값)
+  v: ""    // VWorld 지도 키 (선택)
 };
 window.addEventListener("load", ()=>{
   const forceSetup = location.hash === "#setup";
@@ -1026,7 +1030,8 @@ window.addEventListener("load", ()=>{
   document.getElementById("in-url").value = saved.u || "";
   document.getElementById("in-key").value = saved.k || "";
   document.getElementById("in-dev").value = saved.d || "";
-  if (!forceSetup && saved.u && saved.k && saved.d) init(saved.u, saved.k, saved.d);
+  document.getElementById("in-vw").value = saved.v || "";
+  if (!forceSetup && saved.u && saved.k && saved.d) init(saved.u, saved.k, saved.d, saved.v || "");
 });
 </script>
 </body>

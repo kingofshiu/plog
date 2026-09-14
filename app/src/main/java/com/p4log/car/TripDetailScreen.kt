@@ -38,7 +38,7 @@ object TripDetailScreen {
                 web.evaluateJavascript("showTrip(${trip.polyline});", null)
             }
         })
-        web.loadUrl("file:///android_asset/map.html")
+        web.loadUrl(Prefs.mapUrl(web.context))
         return true
     }
 }

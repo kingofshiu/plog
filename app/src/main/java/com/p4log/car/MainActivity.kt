@@ -37,6 +37,7 @@ class MainActivity : Activity() {
         DashboardPage.demo = debuggable && intent.getBooleanExtra("demo", false)
         DashboardPage.demoCharge = DashboardPage.demo && intent.getBooleanExtra("demo_charge", false)
         DashboardPage.demoParked = DashboardPage.demo && intent.getBooleanExtra("demo_parked", false)
+        EvStations.init(this)
         // 탭바+페이지는 MainUi (주행 중 오버레이와 같은 코드, 2026-09-05)
         ui = MainUi(ActivityHost(this), findViewById(android.R.id.content))
 

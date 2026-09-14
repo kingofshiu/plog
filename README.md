@@ -56,14 +56,26 @@ supabase/supabase_setup.sql    서버 테이블 생성 SQL
 3. **공공데이터포털**: https://www.data.go.kr 가입 → "한국환경공단_전기자동차 충전소 정보" 활용신청 →
    마이페이지에서 **일반 인증키(Encoding)** 복사. 승인까지 몇 시간~하루 걸릴 수 있습니다.
 
-### 2. 키 입력 (파일 4곳)
+### 2. 키 입력 — 빌드 없이 앱 안에서
 
-| 키 | 파일 | 위치 |
+키 4개는 모두 **앱 설정 탭**과 **웹 첫 화면**에서 입력합니다. 소스를 고칠 필요가 없습니다.
+
+| 키 | 차량 앱 | 웹/폰 |
 |---|---|---|
-| Supabase URL · anon 키 | `app/src/main/java/com/p4log/car/Prefs.kt` | `DEFAULT_SB_URL`, `DEFAULT_SB_KEY` (비워 두고 앱 설정 화면에서 입력해도 됨) |
-| Supabase URL · anon 키 | `web/p4log-web.html` | 맨 아래 `DEFAULT_CFG`의 `u`, `k` (비워 두면 첫 화면에서 입력) |
-| VWorld 키 | `app/src/main/assets/map.html`, `app/src/main/java/com/p4log/car/PlaceNames.kt`, `web/p4log-web.html` | `VWORLD_KEY` |
-| data.go.kr 키 | `app/src/main/java/com/p4log/car/EvStations.kt` | `API_KEY_ENC` (Encoding 키를 그대로, 다시 인코딩하지 말 것) |
+| Supabase URL · anon 키 | 설정 탭 "웹 로그 연동" | 첫 화면 |
+| VWorld 키 | 설정 탭 "API 키" (지도·동네 이름) | 첫 화면 (선택) |
+| data.go.kr 키 | 설정 탭 "API 키" (Encoding 키 그대로, 다시 인코딩하지 말 것) | 사용 안 함 |
+
+직접 빌드한다면 `app/src/main/java/com/p4log/car/Prefs.kt`의 `DEFAULT_*` 상수와 `web/p4log-web.html` 맨 아래 `DEFAULT_CFG`에 기본값을 넣어 둘 수도 있습니다.
+
+### 2-1. 빌드가 번거로우면 — 릴리즈 APK 사용
+
+[Releases](https://github.com/dozyco/plog/releases)에 키와 개인 기록이 전혀 없는 APK 두 개가 있습니다.
+
+- `plog-car.apk` — 차량용. 4단계대로 USB로 설치한 뒤 설정 탭에서 키를 입력하면 끝.
+- `plog-mobile.apk` — 폰용(웹 로그 내장). 설치 후 첫 화면에서 URL·키·차량 ID 입력.
+
+이 경우 3단계(빌드)는 건너뜁니다.
 
 ### 3. APK 빌드 (약 5분)
 

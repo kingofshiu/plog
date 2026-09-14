@@ -244,6 +244,7 @@ class LoggerService : Service(), LocationListener {
 
     override fun onCreate() {
         super.onCreate()
+        EvStations.init(this)
         carReader = CarDataReader(this)
         db = Db.get(this)
         createChannel()

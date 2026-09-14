@@ -17,9 +17,10 @@ import java.net.URL
 object EvStations {
 
     private const val TAG = "P4Log.EvSt"
-    // data.go.kr 일반 인증키 — URL 인코딩된 상태 그대로 써야 함 (재인코딩 금지)
-    private const val API_KEY_ENC =
-        ""   // data.go.kr 일반 인증키(Encoding) 입력
+    // data.go.kr 일반 인증키 — URL 인코딩된 상태 그대로 써야 함 (재인코딩 금지).
+    // 2026-09-15: 설정 화면 값(Prefs.dataGoKey). 서비스 시작·설정 저장 때 init()으로 채운다
+    @Volatile private var API_KEY_ENC = ""
+    fun init(context: Context) { API_KEY_ENC = Prefs.dataGoKey(context) }
     private const val PROFILE_RADIUS_M = 150.0
     private const val API_RADIUS_M = 300.0
     private const val ROWS_PER_PAGE = 9999
@@ -163,6 +164,7 @@ object EvStations {
 
     /** 반경 radiusM 안의 충전소들을 statNm 단위로 묶어 거리순으로 */
     private fun queryAround(zcode: String, lat: Double, lon: Double, radiusM: Double): List<Agg> {
+        if (API_KEY_ENC.isBlank()) { Log.w(TAG, "data.go.kr key missing"); return emptyList() }
         val near = HashMap<String, Agg>()
         var totalCount = Int.MAX_VALUE
         var page = 1

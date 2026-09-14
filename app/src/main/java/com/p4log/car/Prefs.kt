@@ -62,6 +62,18 @@ object Prefs {
             .putString("sb_key", key.trim())
             .putString("device_id", deviceId.trim()).apply()
 
+    // 지도·충전소 API 키도 설정 화면에서 입력할 수 있게 (2026-09-15, 공개 릴리즈 APK용 — 소스에 키를 안 넣고 빌드해도 쓸 수 있도록).
+    // 기본값은 개인 빌드에만 들어 있다. 공개 저장소·릴리즈 APK에서는 빈 문자열
+    private const val DEFAULT_VWORLD_KEY = ""   // vworld.kr 인증키 (비워 두면 앱 설정 화면에서 입력)
+    private const val DEFAULT_DATA_GO_KEY = ""   // data.go.kr 일반 인증키(Encoding) (비워 두면 앱 설정 화면에서 입력)
+    fun vworldKey(c: Context): String = (sp(c).getString("vworld_key", "") ?: "").ifBlank { DEFAULT_VWORLD_KEY }
+    fun setVworldKey(c: Context, v: String) = sp(c).edit().putString("vworld_key", v.trim()).apply()
+    /** data.go.kr 일반 인증키 — URL 인코딩된(Encoding) 값 그대로. 재인코딩 금지 */
+    fun dataGoKey(c: Context): String = (sp(c).getString("datago_key", "") ?: "").ifBlank { DEFAULT_DATA_GO_KEY }
+    fun setDataGoKey(c: Context, v: String) = sp(c).edit().putString("datago_key", v.trim()).apply()
+    /** 지도 WebView가 열 주소: map.html이 ?k= 로 VWorld 키를 받는다 */
+    fun mapUrl(c: Context): String = "file:///android_asset/map.html?k=" + java.net.URLEncoder.encode(vworldKey(c), "UTF-8")
+
     fun lastSyncResult(c: Context): String = sp(c).getString("last_sync", "아직 동기화 안 함") ?: ""
     fun setLastSyncResult(c: Context, msg: String) =
         sp(c).edit().putString("last_sync", msg).apply()

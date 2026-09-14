@@ -45,7 +45,7 @@ object ChargeDetailScreen {
                     web.evaluateJavascript("showPoint(" + s.stLat + "," + s.stLon + ");", null)
                 }
             })
-            web.loadUrl("file:///android_asset/map.html")
+            web.loadUrl(Prefs.mapUrl(web.context))
         } else {
             web.visibility = View.GONE
             empty.visibility = View.VISIBLE

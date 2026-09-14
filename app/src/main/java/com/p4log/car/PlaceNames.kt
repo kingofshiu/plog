@@ -16,7 +16,6 @@ import java.util.concurrent.Executors
  * 차량 부하: 주행 1건당 요청 2번(끝났을 때 한 번), 같은 좌표(약 100m 격자)는 메모리 캐시.
  */
 object PlaceNames {
-    private const val VWORLD_KEY = ""   // vworld.kr 인증키 (map.html과 같은 키)   // map.html과 같은 키 (APK 공유 금지 사유)
     private val exec = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private val cache = HashMap<String, String>()
@@ -36,7 +35,7 @@ object PlaceNames {
     fun lookup(context: Context, lat: Double, lon: Double): String? {
         val k = key(lat, lon)
         synchronized(cache) { cache[k]?.let { return it } }
-        val name = try { vworld(lat, lon) } catch (e: Throwable) { null }
+        val name = try { vworld(lat, lon, Prefs.vworldKey(context)) } catch (e: Throwable) { null }
             ?: try { geocoder(context, lat, lon) } catch (e: Throwable) { null }
         if (name != null) synchronized(cache) { cache[k] = name }
         return name
@@ -64,11 +63,12 @@ object PlaceNames {
     }
 
     /** VWorld getAddress: 지번(parcel) 기준 "구 동" — 예: "관악구 봉천동". 없으면 도로명 기준 */
-    private fun vworld(lat: Double, lon: Double): String? {
+    private fun vworld(lat: Double, lon: Double, key: String): String? {
+        if (key.isBlank()) return null
         for (type in arrayOf("parcel", "road")) {
             val url = "https://api.vworld.kr/req/address?service=address&request=getAddress&version=2.0" +
                 "&crs=epsg:4326&format=json&type=" + type + "&zipcode=false&simple=false" +
-                "&point=" + lon + "," + lat + "&key=" + VWORLD_KEY
+                "&point=" + lon + "," + lat + "&key=" + key
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.connectTimeout = 5000; conn.readTimeout = 5000
             conn.setRequestProperty("Referer", "https://p4log.app/")

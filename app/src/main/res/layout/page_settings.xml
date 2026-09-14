@@ -38,6 +38,15 @@
                 <EditText android:id="@+id/set_odo" style="@style/SetEdit"
                     android:inputType="number" />
 
+                <!-- 지도·충전소 API 키 (2026-09-15): 공개 릴리즈 APK는 키가 비어 있어 여기서 넣는다 -->
+                <TextView style="@style/HeroLabel" android:text="API 키" android:drawableStart="@drawable/ic_st_station" android:layout_marginTop="28dp" />
+                <TextView style="@style/SetLabel" android:text="VWorld 지도 인증키 (vworld.kr) — 지도·동네 이름" />
+                <EditText android:id="@+id/set_vworld" style="@style/SetEdit"
+                    android:inputType="text" />
+                <TextView style="@style/SetLabel" android:text="충전소 정보 API 키 (data.go.kr, 일반 인증키 Encoding)" />
+                <EditText android:id="@+id/set_datago" style="@style/SetEdit"
+                    android:inputType="text" />
+
 
                 <TextView
                     android:layout_width="wrap_content"
