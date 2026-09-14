@@ -12,11 +12,24 @@
     display:none; color:#9A9AA0; font-family:sans-serif; text-align:center;
     padding-top:40px; font-size:15px;
   }
+  #legend {
+    display:none; position:absolute; left:8px; bottom:8px; z-index:500;
+    background:rgba(0,0,0,.72); color:#F2F2F2; font-family:sans-serif;
+    font-size:13px; padding:7px 10px; border-radius:2px; line-height:1.7;
+  }
+  #legend .sw { display:inline-block; width:11px; height:11px; border-radius:2px;
+    margin-right:5px; vertical-align:-1px; }
 </style>
 </head>
 <body>
 <div id="map"></div>
 <div id="offline">지도를 불러오지 못했습니다<br>인터넷 연결 또는 VWorld 서버 상태를 확인하세요</div>
+<div id="legend">
+  <span class="sw" style="background:#3ECF6E"></span>6+ km/kWh&nbsp;&nbsp;
+  <span class="sw" style="background:#FFB020"></span>4~6&nbsp;&nbsp;
+  <span class="sw" style="background:#FF5C5C"></span>4 미만&nbsp;&nbsp;
+  <span class="sw" style="background:#4DA3FF"></span>회생
+</div>
 <script>
   var map = null;
 
@@ -50,26 +63,155 @@
     return true;
   }
 
-  /* 주행 경로: points = [[lat,lon],...] */
+  /* 두 좌표 간 거리 (m) */
+  function distM(a, b) {
+    var R = 6371000, toRad = Math.PI / 180;
+    var dLat = (b[0] - a[0]) * toRad, dLon = (b[1] - a[1]) * toRad;
+    var s = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a[0] * toRad) * Math.cos(b[0] * toRad) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+
+  /* 구간 전비 → 색 (연비 트래픽). null=데이터 없음, -1=회생/무소모 */
+  function effColor(eff) {
+    if (eff === null) return "#FF7500";
+    if (eff < 0) return "#4DA3FF";
+    if (eff >= 6) return "#3ECF6E";
+    if (eff >= 4) return "#FFB020";
+    return "#FF5C5C";
+  }
+
+  /* 타일을 뺀 모든 레이어(경로·마커) 제거 — 같은 지도에서 다른 주행을 다시 그릴 때 (전체 주행 기록 화면, 2026-09-06) */
+  function clearOverlays() {
+    if (!map) return;
+    map.eachLayer(function (l) { if (!(l instanceof L.TileLayer)) map.removeLayer(l); });
+    var lg = document.getElementById("legend"); if (lg) lg.style.display = "none";
+  }
+
+  /* 주행 경로: points = [[lat,lon]] 또는 [[lat,lon,wh]] (wh 있으면 구간별 전비 색상) */
   function showTrip(points) {
     if (!initMap()) return;
+    clearOverlays();
     if (!points || points.length === 0) {
       map.setView([35.1796, 129.0756], 11); /* 기본: 부산 */
       return;
     }
-    var line = L.polyline(points, { color: "#FF7A1A", weight: 5, opacity: 0.9 }).addTo(map);
-    L.circleMarker(points[0], { radius: 7, color: "#3ECF6E", fillColor: "#3ECF6E",
+    var latlngs = points.map(function (p) { return [p[0], p[1]]; });
+    var hasWh = points.filter(function (p) { return p.length >= 3 && p[2] != null; }).length
+      >= points.length * 0.8 && points.length >= 4;
+
+    if (!hasWh) {
+      L.polyline(latlngs, { color: "#FF7500", weight: 5, opacity: 0.9 }).addTo(map);
+    } else {
+      /* 차량이 배터리 Wh를 ~1kWh 단위로 뚝뚝 보고하므로,
+         Wh가 실제로 변한 지점 단위로 구간을 끊어 전비를 계산한다.
+         (거리 대비 소모량 → km/kWh. Wh 증가 = 회생) */
+      var start = 0, dist = 0, lastColor = "#FF7500";
+      for (var i = 1; i < points.length; i++) {
+        dist += distM(points[i - 1], points[i]);
+        var whA = points[start][2], whB = points[i][2];
+        var changed = whA != null && whB != null && whB !== whA;
+        var isLast = i === points.length - 1;
+        if ((changed && dist >= 150) || isLast) {
+          var color;
+          if (!changed) {
+            color = lastColor; /* 꼬리 구간: Wh 변화 없으면 직전 색 유지 */
+          } else {
+            var used = whA - whB; /* Wh */
+            var eff = used < 0 ? -1 : (dist / 1000) / (used / 1000);
+            color = effColor(eff);
+          }
+          L.polyline(latlngs.slice(start, i + 1),
+            { color: color, weight: 5, opacity: 0.95 }).addTo(map);
+          lastColor = color;
+          start = i; dist = 0;
+        }
+      }
+      document.getElementById("legend").style.display = "block";
+    }
+
+    L.circleMarker(latlngs[0], { radius: 7, color: "#3ECF6E", fillColor: "#3ECF6E",
       fillOpacity: 1 }).addTo(map).bindPopup("출발");
-    L.circleMarker(points[points.length - 1], { radius: 7, color: "#FF5C5C",
+    L.circleMarker(latlngs[latlngs.length - 1], { radius: 7, color: "#FF5C5C",
       fillColor: "#FF5C5C", fillOpacity: 1 }).addTo(map).bindPopup("도착");
-    map.fitBounds(line.getBounds(), { padding: [30, 30] });
+    map.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30] });
   }
 
-  /* 단일 지점 (주차 위치) */
+  /* 라이브 경로 (주행 탭, 2026-09-15): 주행 중 5초마다 지금까지의 경로를 다시 그린다.
+     showTrip과 같은 전비 색이지만 범위를 매번 맞추지 않고 마지막 점을 따라간다(차가 지도 가운데). 출발·도착 팝업 없음 */
+  var liveZoomed = false;
+  function liveTrip(points) {
+    if (!initMap()) return;
+    clearOverlays();
+    if (!points || points.length === 0) { if (!liveZoomed) map.setView([36.5, 127.8], 7); return; }
+    var latlngs = points.map(function (p) { return [p[0], p[1]]; });
+    var hasWh = points.filter(function (p) { return p.length >= 3 && p[2] != null; }).length >= points.length * 0.8 && points.length >= 4;
+    if (!hasWh) {
+      L.polyline(latlngs, { color: "#FF7500", weight: 5, opacity: 0.9 }).addTo(map);
+    } else {
+      var start = 0, dist = 0, lastColor = "#FF7500";
+      for (var i = 1; i < points.length; i++) {
+        dist += distM(points[i - 1], points[i]);
+        var whA = points[start][2], whB = points[i][2];
+        var changed = whA != null && whB != null && whB !== whA;
+        var isLast = i === points.length - 1;
+        if ((changed && dist >= 150) || isLast) {
+          var color;
+          if (!changed) color = lastColor;
+          else { var used = whA - whB; var eff = used < 0 ? -1 : (dist / 1000) / (used / 1000); color = effColor(eff); }
+          L.polyline(latlngs.slice(start, i + 1), { color: color, weight: 5, opacity: 0.95 }).addTo(map);
+          lastColor = color; start = i; dist = 0;
+        }
+      }
+      document.getElementById("legend").style.display = "block";
+    }
+    L.circleMarker(latlngs[0], { radius: 6, color: "#3ECF6E", fillColor: "#3ECF6E", fillOpacity: 1 }).addTo(map);
+    var last = latlngs[latlngs.length - 1];
+    L.circleMarker(last, { radius: 9, color: "#FFFFFF", weight: 3, fillColor: "#FF7500", fillOpacity: 1 }).addTo(map);
+    if (!liveZoomed) {
+      map.invalidateSize();
+      if (latlngs.length > 1) map.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30], maxZoom: 15 });
+      else map.setView(last, 15);
+      liveZoomed = true;
+    } else {
+      map.panTo(last, { animate: true, duration: 0.6 });
+    }
+  }
+
+  /* 단일 지점 (주차 위치 / 충전소 위치) */
   function showPoint(lat, lon) {
     if (!initMap()) return;
+    clearOverlays();
     L.marker([lat, lon]).addTo(map);
-    map.setView([lat, lon], 17);
+    map.invalidateSize();
+    setTimeout(function () { map.invalidateSize(); map.setView([lat, lon], 17); }, 250);
+  }
+
+  /* 충전소 후보 (2026-09-08): points = [[lat,lon,"이름"],...]. 번호 마커, 누르면 앱(P4.pick)에 알린다.
+     center = [lat,lon] 충전 위치(작은 점) */
+  function showCandidates(center, points) {
+    if (!initMap()) return;
+    clearOverlays();
+    if (center) L.circleMarker(center, { radius: 7, color: "#FF7500", fillColor: "#FF7500", fillOpacity: 1 }).addTo(map);
+    var bounds = [];
+    if (center) bounds.push(center);
+    points.forEach(function (p, i) {
+      var icon = L.divIcon({ className: "", iconSize: [34, 34], iconAnchor: [17, 17],
+        html: '<div style="width:34px;height:34px;border-radius:17px;background:#FF7500;color:#000;font:700 18px sans-serif;' +
+              'display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(0,0,0,.6)">' + (i + 1) + '</div>' });
+      L.marker([p[0], p[1]], { icon: icon }).addTo(map)
+        .bindTooltip(p[2], { permanent: true, direction: "top", offset: [0, -20], opacity: 0.95 })
+        .on("click", function () { if (window.P4 && P4.pick) P4.pick(i); });
+      bounds.push([p[0], p[1]]);
+    });
+    /* 지도 칸 크기가 방금 바뀐 경우(타임라인을 숨겨 키움) Leaflet이 새 크기를 알아야 범위가 맞는다 */
+    map.invalidateSize();
+    setTimeout(function () {
+      map.invalidateSize();
+      if (bounds.length > 1) map.fitBounds(L.latLngBounds(bounds), { padding: [50, 50], maxZoom: 17 });
+      else if (center) map.setView(center, 16);
+    }, 250);
   }
 </script>
 </body>

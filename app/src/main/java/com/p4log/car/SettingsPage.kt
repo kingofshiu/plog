@@ -1,7 +1,7 @@
 package com.p4log.car
 
-import android.app.Activity
-import android.content.Intent
+import android.text.method.HideReturnsTransformationMethod
+import android.text.method.PasswordTransformationMethod
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -9,21 +9,30 @@ import android.widget.TextView
 import android.widget.Toast
 
 /** 설정 탭 */
-class SettingsPage(private val activity: Activity, root: View) : PageController {
+class SettingsPage(private val host: AppHost, root: View) : PageController {
+    private val activity get() = host.context
 
     private val etCapacity: EditText = root.findViewById(R.id.set_capacity)
     private val etOdo: EditText = root.findViewById(R.id.set_odo)
     private val etSbUrl: EditText = root.findViewById(R.id.set_sb_url)
     private val etSbKey: EditText = root.findViewById(R.id.set_sb_key)
+    private val tvKeyToggle: TextView = root.findViewById(R.id.set_sb_key_toggle)
     private val etDeviceId: EditText = root.findViewById(R.id.set_device_id)
     private val tvSyncState: TextView = root.findViewById(R.id.set_sync_state)
+    private var keyShown = false
 
     init {
         root.findViewById<Button>(R.id.set_save).setOnClickListener { save() }
         root.findViewById<Button>(R.id.set_test).setOnClickListener { testConnection() }
         root.findViewById<Button>(R.id.set_sync_now).setOnClickListener { syncNow() }
-        root.findViewById<Button>(R.id.set_diag).setOnClickListener {
-            activity.startActivity(Intent(activity, DiagnosticsActivity::class.java))
+        root.findViewById<Button>(R.id.set_diag).setOnClickListener { host.openDiagnostics() }
+        // 키는 평소에 가려둔다 (2026-09-13: 화면 캡처·동승자에게 그대로 보이던 문제). [보기]로 잠깐 펼침
+        tvKeyToggle.setOnClickListener {
+            keyShown = !keyShown
+            etSbKey.transformationMethod =
+                if (keyShown) HideReturnsTransformationMethod.getInstance() else PasswordTransformationMethod.getInstance()
+            etSbKey.setSelection(etSbKey.text.length)
+            tvKeyToggle.text = if (keyShown) "가리기" else "보기"
         }
     }
 
@@ -66,7 +75,7 @@ class SettingsPage(private val activity: Activity, root: View) : PageController 
         tvSyncState.text = "연결 확인 중..."
         Thread {
             val msg = SyncManager.testConnection(url, key)
-            activity.runOnUiThread { tvSyncState.text = "연결 테스트: $msg" }
+            host.runOnUi { tvSyncState.text = "연결 테스트: $msg" }
         }.start()
     }
 
@@ -74,7 +83,7 @@ class SettingsPage(private val activity: Activity, root: View) : PageController 
         save()
         tvSyncState.text = "업로드 중..."
         SyncManager.uploadAsync(activity.applicationContext) { result ->
-            activity.runOnUiThread { tvSyncState.text = "마지막 동기화: $result" }
+            host.runOnUi { tvSyncState.text = "마지막 동기화: $result" }
         }
     }
 }

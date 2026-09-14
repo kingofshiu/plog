@@ -21,14 +21,14 @@
                 android:id="@+id/rt_when"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="23sp"
+                android:textSize="@dimen/text_body"
                 android:fontFamily="sans-serif-medium"
                 android:textColor="@color/text" />
             <TextView
                 android:id="@+id/rt_detail"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="18sp"
+                android:textSize="@dimen/text_label"
                 android:textColor="@color/text_sub"
                 android:layout_marginTop="5dp" />
         </LinearLayout>
@@ -43,7 +43,7 @@
                 android:id="@+id/rt_km"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="38sp"
+                android:textSize="@dimen/text_value_m"
                 android:fontFamily="sans-serif-light"
                 android:textColor="@color/accent"
                 android:includeFontPadding="false" />
@@ -51,7 +51,7 @@
                 android:id="@+id/rt_eff"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="17sp"
+                android:textSize="@dimen/text_label"
                 android:textColor="@color/text_sub"
                 android:layout_marginTop="3dp" />
         </LinearLayout>

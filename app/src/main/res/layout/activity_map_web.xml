@@ -17,13 +17,13 @@
             android:layout_height="48dp"
             android:gravity="center"
             android:text="←"
-            android:textSize="24sp"
+            android:textSize="@dimen/text_body"
             android:textColor="@color/text" />
         <TextView
             android:id="@+id/map_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="18sp"
+            android:textSize="@dimen/text_small"
             android:fontFamily="sans-serif-medium"
             android:textColor="@color/text" />
     </LinearLayout>

@@ -2,142 +2,62 @@ package com.p4log.car
 
 import android.app.Activity
 import android.content.pm.PackageManager
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
-import android.view.View
-import android.widget.FrameLayout
-import android.widget.LinearLayout
 
 class MainActivity : Activity() {
 
     companion object {
         private const val REQ_PERMS = 100
+        private const val REQ_BG_LOC = 101
+
+        /** 절전 예외 안내는 앱 실행(프로세스)당 한 번만 — 허용할 때까지 켤 때마다 다시 묻는다 */
+        @Volatile private var batteryPromptShown = false
+
+        /**
+         * 주행 오버레이 게이트 (2026-09-08, 실차 확인 후 사용자: "앱을 안 켜뒀는데도 움직이기만 하면 무조건 뜬다").
+         * 오버레이는 **앱이 화면에 떠 있다가 주행 차단으로 가려진 경우에만** 띄운다.
+         *  - visible: 지금 MainActivity가 화면에 있음
+         *  - lastVisibleTs: 마지막으로 화면에서 내려간 시각 (차단 화면이 덮으면 onPause가 먼저 오고 UX 이벤트가 뒤따른다)
+         *  - overlayDismissed: 오버레이의 [닫기]를 눌렀음 → 앱을 다시 열 때까지 안 띄움
+         */
+        @Volatile var visible = false
+        @Volatile var lastVisibleTs = 0L
+        @Volatile var overlayDismissed = false
     }
 
-    private lateinit var content: FrameLayout
-    private lateinit var tabBar: LinearLayout
-    private val pageViews = HashMap<Int, View>()
-    private val pages = HashMap<Int, PageController>()
-    private var currentTab = -1
-
-    // 탭 정의: (라벨, 레이아웃, 컨트롤러 생성)
-    private val tabs: List<Triple<String, Int, (View) -> PageController>> = listOf(
-        Triple("대시", R.layout.page_dashboard) { v: View -> DashboardPage(this, v) },
-        Triple("주행", R.layout.page_trips) { v: View -> TripsPage(this, v) },
-        Triple("충전", R.layout.page_charges) { v: View -> ChargesPage(this, v) },
-        Triple("차량", R.layout.page_care) { v: View -> CarePage(this, v) },
-        Triple("설정", R.layout.page_settings) { v: View -> SettingsPage(this, v) }
-    )
-    private val tabIcons = intArrayOf(
-        R.drawable.ic_tab_dash, R.drawable.ic_tab_trip, R.drawable.ic_bolt,
-        R.drawable.ic_tab_car, R.drawable.ic_tab_settings
-    )
-
-    private val uiHandler = Handler(Looper.getMainLooper())
-    private val uiTicker = object : Runnable {
-        override fun run() {
-            pages[currentTab]?.onTick()
-            uiHandler.postDelayed(this, 1000L)
-        }
-    }
+    private lateinit var ui: MainUi
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        content = findViewById(R.id.main_content)
-        tabBar = findViewById(R.id.main_tabbar)
-
-        val dp = resources.displayMetrics.density
-        for (i in tabs.indices) {
-            // 셀은 균등 분할, 필(pill)은 아이콘+글자에만 붙도록 내부 컨테이너에 배경 적용
-            val cell = android.widget.FrameLayout(this)
-            cell.setBackgroundResource(R.drawable.bg_tab)
-            cell.isClickable = true
-
-            val inner = LinearLayout(this)
-            inner.orientation = LinearLayout.HORIZONTAL
-            inner.gravity = android.view.Gravity.CENTER
-            inner.setPadding((18 * dp).toInt(), (9 * dp).toInt(), (18 * dp).toInt(), (9 * dp).toInt())
-
-            val iv = android.widget.ImageView(this)
-            iv.setImageResource(tabIcons[i])
-            iv.setColorFilter(Color.parseColor("#C9C9CE"))
-            inner.addView(iv, LinearLayout.LayoutParams((24 * dp).toInt(), (24 * dp).toInt()))
-
-            val tv = android.widget.TextView(this)
-            tv.text = tabs[i].first
-            tv.textSize = 18f
-            tv.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-            tv.setTextColor(Color.parseColor("#C9C9CE"))
-            val tvLp = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            tvLp.marginStart = (8 * dp).toInt()
-            inner.addView(tv, tvLp)
-
-            cell.addView(
-                inner,
-                android.widget.FrameLayout.LayoutParams(
-                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
-                    android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
-                    android.view.Gravity.CENTER
-                )
-            )
-            cell.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-            cell.setOnClickListener { showTab(i) }
-            tabBar.addView(cell)
-        }
+        // 레이아웃 점검용 데모 데이터 (에뮬레이터: am start ... --ez demo true). 디버그 빌드에서만 (2026-09-06)
+        // MainUi가 첫 탭을 바로 띄우므로(onShow → 실시간 구독) 플래그는 MainUi 생성 전에 정해야 한다 (2026-09-13)
+        val debuggable = (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        DashboardPage.demo = debuggable && intent.getBooleanExtra("demo", false)
+        DashboardPage.demoCharge = DashboardPage.demo && intent.getBooleanExtra("demo_charge", false)
+        DashboardPage.demoParked = DashboardPage.demo && intent.getBooleanExtra("demo_parked", false)
+        // 탭바+페이지는 MainUi (주행 중 오버레이와 같은 코드, 2026-09-05)
+        ui = MainUi(ActivityHost(this), findViewById(android.R.id.content))
 
         requestNeededPermissions()
+        requestBackgroundLocation()
         LoggerService.start(this)
-        showTab(0)
+        retryParkingPhotoIfPending()
     }
 
     override fun onResume() {
         super.onResume()
-        pages[currentTab]?.onShow()
-        uiHandler.post(uiTicker)
+        visible = true
+        overlayDismissed = false
+        ui.start()
     }
 
     override fun onPause() {
         super.onPause()
-        uiHandler.removeCallbacks(uiTicker)
-    }
-
-    fun showTab(index: Int) {
-        if (index == currentTab) return
-        for ((_, pv) in pageViews) pv.visibility = View.GONE
-        val v: View = pageViews[index] ?: run {
-            val nv = layoutInflater.inflate(tabs[index].second, content, false)
-            content.addView(nv)
-            pageViews[index] = nv
-            pages[index] = tabs[index].third(nv)
-            nv
-        }
-        v.visibility = View.VISIBLE
-        // 탭 전환 애니메이션: 살짝 아래에서 떠오르며 페이드 인
-        v.alpha = 0f
-        v.translationY = 24f
-        v.animate().alpha(1f).translationY(0f).setDuration(240)
-            .setInterpolator(android.view.animation.DecelerateInterpolator()).start()
-        currentTab = index
-        val dp = resources.displayMetrics.density
-        for (i in 0 until tabBar.childCount) {
-            val cell = tabBar.getChildAt(i) as android.widget.FrameLayout
-            val inner = cell.getChildAt(0) as LinearLayout
-            val sel = i == index
-            val c = if (sel) Color.parseColor("#FF7500") else Color.parseColor("#C9C9CE")
-            (inner.getChildAt(0) as android.widget.ImageView).setColorFilter(c)
-            (inner.getChildAt(1) as android.widget.TextView).setTextColor(c)
-            if (sel) inner.setBackgroundResource(R.drawable.bg_tab_selected)
-            else inner.background = null
-            // 배경 교체가 패딩을 초기화하므로 재적용
-            inner.setPadding((18 * dp).toInt(), (9 * dp).toInt(), (18 * dp).toInt(), (9 * dp).toInt())
-        }
-        pages[index]?.onShow()
+        visible = false
+        lastVisibleTs = System.currentTimeMillis()
+        ui.stop()
     }
 
     // ---------- 권한 ----------
@@ -146,6 +66,7 @@ class MainActivity : Activity() {
         val perms = ArrayList<String>()
         perms.add(android.Manifest.permission.ACCESS_FINE_LOCATION)
         perms.add(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+        perms.add(android.Manifest.permission.CAMERA) // 주차 사진 (실차 전면 카메라 확인됨)
         if (Build.VERSION.SDK_INT >= 33) {
             perms.add("android.permission.POST_NOTIFICATIONS")
         }
@@ -164,21 +85,69 @@ class MainActivity : Activity() {
         if (need.isNotEmpty()) requestPermissions(need, REQ_PERMS)
     }
 
+    /**
+     * 주차 사진 재시도 (2026-08-31).
+     *
+     * 주행 종료 시 촬영은 앱이 백그라운드라 Android의 while-in-use 제한에 막힌다
+     * (실차 로그: 앱을 연 날 아침은 성공, 안 연 저녁은 `정책상 카메라 차단`).
+     * 앱이 화면에 떠 있는 지금은 확실히 찍힌다 — 주차한 지 얼마 안 됐으면 여기서 만회한다.
+     */
+    private fun retryParkingPhotoIfPending() {
+        if (!Prefs.photoFailed(this)) return
+        if (checkSelfPermission(android.Manifest.permission.CAMERA) !=
+            PackageManager.PERMISSION_GRANTED) return
+        val db = Db.get(this)
+        val p = db.parking() ?: return
+        if (p.photoTs != null) return                       // 이미 사진이 있다
+        val minsAgo = (System.currentTimeMillis() - p.ts) / 60_000L
+        if (minsAgo > 30) return                            // 오래된 주차면 지금 찍어봐야 딴 장면이다
+        ServiceLog.add(this, "주차 사진 재시도 (앱 실행, 주차 " + minsAgo + "분 전)")
+        ParkingCamera.captureAsync(this) { file, err ->
+            if (file != null) {
+                db.setParkingPhotoTs(System.currentTimeMillis())
+                Prefs.setPhotoFailed(this, false)
+                ServiceLog.add(this, "주차 사진 재시도 성공 (" + (file.length() / 1024) + "KB)")
+                SyncManager.uploadAsync(applicationContext) { }
+            } else {
+                ServiceLog.add(this, "주차 사진 재시도 실패: " + (err ?: "알 수 없음"))
+            }
+        }
+    }
+
+    /**
+     * '위치 항상 허용'(ACCESS_BACKGROUND_LOCATION) 요청 (2026-08-30).
+     *
+     * 이게 없으면 앱이 화면에 떠 있을 때만 GPS가 열린다. 실차 로그에서 **앱을 연 날만
+     * 주행이 기록되고**, 나머지 날은 28분을 달려도 `주행 폐기: 0m`로 버려졌다.
+     * Android 11+는 前면 위치를 먼저 받은 뒤 **따로** 요청해야 하고, 시스템이 설정 화면을 띄운다.
+     */
+    private fun requestBackgroundLocation() {
+        if (Build.VERSION.SDK_INT < 29) return
+        val fine = checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+        val bg = checkSelfPermission("android.permission.ACCESS_BACKGROUND_LOCATION") ==
+            PackageManager.PERMISSION_GRANTED
+        if (!fine || bg) return
+        try {
+            requestPermissions(arrayOf("android.permission.ACCESS_BACKGROUND_LOCATION"), REQ_BG_LOC)
+        } catch (e: Throwable) {
+            ServiceLog.add(this, "위치 항상 허용 요청 실패: " + e.javaClass.simpleName)
+        }
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQ_PERMS) {
-            // 위치 권한을 받았으면 서비스 재시작해서 GPS 활성화
+            // 앞 단계(위치 등)를 받은 다음에야 '항상 허용'을 물을 수 있다
+            requestBackgroundLocation()
+            LoggerService.start(this)
+        } else if (requestCode == REQ_BG_LOC) {
+            val ok = grantResults.isNotEmpty() &&
+                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            ServiceLog.add(this, "위치 항상 허용: " + (if (ok) "허용됨" else "거부됨"))
             LoggerService.start(this)
         }
     }
-}
-
-/** 각 탭 페이지 공통 인터페이스 */
-interface PageController {
-    /** 탭이 화면에 나타날 때 */
-    fun onShow()
-    /** 1초마다 (현재 탭만) */
-    fun onTick() {}
 }

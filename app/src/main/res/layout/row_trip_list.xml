@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 주행 기록 화면 왼쪽 목록 한 줄 (2026-09-06): 시각 / 시간·전비 / 거리. 선택된 행은 코드에서 배경을 준다 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp">
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+        <TextView
+            android:id="@+id/rl_when"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="@dimen/text_body"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/text" />
+        <TextView
+            android:id="@+id/rl_sub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textSize="@dimen/text_label"
+            android:textColor="@color/text_sub"
+            android:layout_marginTop="4dp" />
+    </LinearLayout>
+    <TextView
+        android:id="@+id/rl_km"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="@dimen/text_value_m"
+        android:fontFamily="sans-serif-light"
+        android:textColor="@color/accent"
+        android:includeFontPadding="false"
+        android:layout_marginStart="12dp" />
+</LinearLayout>

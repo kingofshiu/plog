@@ -13,8 +13,24 @@
     <!-- 포그라운드 서비스 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <!-- 주차 사진용. 촬영 직전에만 서비스 타입에 camera를 얹는다 (2026-08-25).
+         이게 없으면 백그라운드에서 CAMERA_DISABLED("disabled by policy")로 촬영이 거부된다 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- 서비스 부활용 하트비트 알람 (2026-08-19).
+         AllowWhileIdle 알람이 발화하면 앱이 임시 허용목록에 올라 포그라운드 서비스를 시작할 수 있다.
+         USE_EXACT_ALARM은 설치 시 자동 허용(API 33+), SCHEDULE_EXACT_ALARM은 사용자 허용이 필요할 수 있음.
+         둘 다 없으면 코드가 부정확 알람으로 자동 폴백한다 -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- 절전 예외 요청 다이얼로그를 띄우기 위함 (사용자가 허용해야 적용됨) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- 다른 앱 위에 표시 (2026-09-04): 실차 do=false → 주행 중 표시의 남은 길은 오버레이 창.
+         폴스타 설정에 허용 화면이 있는지 진단 화면 [오버레이 권한]으로 확인한다 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <!-- 카메라 (주차 사진 — 폴스타4가 서드파티에 여는지 진단 화면에서 조사, 2026-08-09) -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -26,23 +42,58 @@
     <uses-permission android:name="android.car.permission.CAR_ENERGY_PORTS" />
     <uses-permission android:name="android.car.permission.CAR_SPEED" />
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
+    <!-- 폴스타 비공식 클라우드 API가 노출하는 항목 중, 차 안에서 직접 읽을 수 있는지
+         조사해 볼 것들 (2026-08-31). 안 되면 진단에 "권한 거부"로만 남고 기능엔 영향 없음 -->
+    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_ENVIRONMENT" />
+    <uses-permission android:name="android.car.permission.CAR_TIRES" />
     <!-- 아래는 시스템(privileged) 권한이라 사이드로드 앱엔 거부될 가능성이 높음. 진단 화면에서 확인용 -->
     <uses-permission android:name="android.car.permission.CAR_MILEAGE" />
 
+    <!-- 동반 기기 연결 (2026-09-03). AOSP ActivityStarter: 연결된 앱은 백그라운드에서 액티비티를
+         띄울 수 있다 → 주차 시 투명 PhotoActivity를 띄워 카메라 허용(앱이 화면에 있을 것)을 얻는다.
+         두 권한은 연결된 앱의 백그라운드 서비스 시작 예외용. (자체 관리 연결 권한
+         REQUEST_COMPANION_SELF_MANAGED 는 signature|privileged 라 사이드로드 앱은 못 받는다 — 블루투스 방식 사용) -->
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />
+    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />
+    <!-- CDM 서비스는 호출 앱 매니페스트에 이 feature 선언이 없으면 IllegalStateException을 던진다
+         (에뮬레이터 확인: "Must declare uses-feature android.software.companion_device_setup") -->
+    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />
+
     <uses-feature android:name="android.hardware.type.automotive" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+
+    <!-- targetSdk 22 앱은 화면 비율 상한이 낮게 적용돼 차량 화면(1080×600)보다 좁게 레터박스로 그려진다
+         (2026-09-05 에뮬레이터·실차 확인: 좌우 검은 띠). 크기 조절 가능 + 비율 상한 해제로 전체 폭 사용 -->
+    <supports-screens
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="true"
+        android:xlargeScreens="true"
+        android:anyDensity="true" />
 
     <application
         android:label="P.Log"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/Theme.P4Log"
+        android:resizeableActivity="true"
+        android:maxAspectRatio="4.0"
         android:allowBackup="true">
 
+        <!-- 차량 미디어 앱에 미디어 소스로 등록 (주행 중 표시 실험) -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- distractionOptimized: 주행 중에도 AAOS가 화면에서 막지 않게 (2026-09-02).
+             이게 없으면 차가 움직일 때 "운전 중에는 사용할 수 없습니다"로 가려진다.
+             앱이 화면에 떠 있어야 주행 종료 시 주차 사진 촬영이 허용된다 (08-31 성공 조건) -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
+            <meta-data android:name="distractionOptimized" android:value="true" />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -52,27 +103,65 @@
         <activity
             android:name=".TripDetailActivity"
             android:exported="false"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" >
+            <meta-data android:name="distractionOptimized" android:value="true" />
+        </activity>
 
+        <activity
+            android:name=".TripsActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" >
+            <meta-data android:name="distractionOptimized" android:value="true" />
+        </activity>
         <activity
             android:name=".ChargeDetailActivity"
             android:exported="false"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" >
+            <meta-data android:name="distractionOptimized" android:value="true" />
+        </activity>
 
         <activity
             android:name=".MapWebActivity"
             android:exported="false"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" >
+            <meta-data android:name="distractionOptimized" android:value="true" />
+        </activity>
 
         <activity
             android:name=".DiagnosticsActivity"
             android:exported="false"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" />
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode" >
+            <meta-data android:name="distractionOptimized" android:value="true" />
+        </activity>
+
+        <!-- 주차 사진용 투명 액티비티. 서비스가 백그라운드에서 띄운다 (동반 기기 연결 시 허용).
+             별도 태스크(singleInstance)라 메인 화면을 끌어올리지 않고, 최근 목록에도 안 남는다 -->
+        <activity
+            android:name=".PhotoActivity"
+            android:exported="false"
+            android:theme="@style/Theme.P4Log.Photo"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="com.p4log.car.photo"
+            android:launchMode="singleInstance"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
+            <meta-data android:name="distractionOptimized" android:value="true" />
+        </activity>
+
+        <!-- 주행 중 표시 실험 (2026-09-05): 순정 미디어 앱이 붙는 MediaBrowserService.
+             시스템 미디어 화면(주행 중에도 보임)에 배터리·주행 숫자를 목록/지금재생으로 얹는다 -->
+        <service
+            android:name=".PlogMediaService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".LoggerService"
             android:exported="false"
-            android:foregroundServiceType="location" />
+            android:foregroundServiceType="location|camera" />
 
         <receiver
             android:name=".BootReceiver"
@@ -80,6 +169,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
     </application>

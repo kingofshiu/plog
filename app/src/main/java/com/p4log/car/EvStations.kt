@@ -18,27 +18,67 @@ object EvStations {
 
     private const val TAG = "P4Log.EvSt"
     // data.go.kr 일반 인증키 — URL 인코딩된 상태 그대로 써야 함 (재인코딩 금지)
-    private const val API_KEY_ENC = "" // data.go.kr "한국환경공단_전기자동차 충전소 정보" 인증키(URL 인코딩 형태)를 입력
+    private const val API_KEY_ENC =
+        ""   // data.go.kr 일반 인증키(Encoding) 입력
     private const val PROFILE_RADIUS_M = 150.0
     private const val API_RADIUS_M = 300.0
     private const val ROWS_PER_PAGE = 9999
     private const val MAX_PAGES = 6
 
-    data class Found(val name: String, val operator: String?, val rate: Double?)
+    /** outputs: 그 충전소에 있는 충전기 정격 출력 목록 (kW, 쉼표 구분. 예 "50,100,200") */
+    data class Found(val name: String, val operator: String?, val rate: Double?, val outputs: String?)
 
-    private data class ApiHit(val name: String, val operator: String?, val lat: Double, val lon: Double)
+    private data class ApiHit(val name: String, val operator: String?, val lat: Double,
+                              val lon: Double, val outputs: String?)
+
+    /** 사용자가 직접 고를 후보 충전소 (2026-09-08). distM = 충전 위치에서의 거리 */
+    data class Candidate(val name: String, val operator: String?, val lat: Double, val lon: Double,
+                         val outputs: String?, val distM: Double)
 
     /**
-     * 운영사별 공표 단가 (비회원, 원/kWh). 확실한 것만 등록 — 없으면 null(설정의 기본 요금 사용).
-     * 단가는 수시로 바뀌므로 갱신은 수동 (Claude에게 "운영사 요금표 갱신" 요청)
+     * 충전 위치 반경 radiusM 안의 충전소 후보를 거리순으로 (최대 limit개). 사용자가 지도/목록에서 직접 고르는 용도.
+     * 콜백은 main 스레드. API 실패면 빈 목록.
      */
-    fun operatorRate(operator: String?, type: String): Double? {
-        if (operator == null) return null
-        val dc = type == "DC"
-        return when {
-            operator.contains("환경부") -> if (dc) 347.2 else 292.9
-            else -> null
-        }
+    fun nearbyAsync(lat: Double, lon: Double, radiusM: Double, limit: Int, cb: (List<Candidate>) -> Unit) {
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        Thread {
+            val list = try {
+                val zcode = zcodeOf(lat, lon)
+                if (zcode == null) emptyList() else queryAround(zcode, lat, lon, radiusM).take(limit).map {
+                    Candidate(it.name, it.operator, it.lat, it.lon,
+                        if (it.outputs.isEmpty()) null else it.outputs.joinToString(","), it.dist)
+                }
+            } catch (e: Throwable) { Log.w(TAG, "nearby failed", e); emptyList() }
+            main.post { cb(list) }
+        }.start()
+    }
+
+    /**
+     * 환경부 회원카드 로밍 단가 (원/kWh) — 충전기 정격 출력 구간별 5단계.
+     * 전국 공표 표준 단가라 운영사와 무관하게 적용한다 (2026-08-18 기준).
+     * 단가가 개정되면 이 표의 숫자만 고치면 된다.
+     */
+    fun roamingRate(outputKw: Double): Double = when {
+        outputKw < 30.0 -> 295.0
+        outputKw < 50.0 -> 307.2
+        outputKw < 100.0 -> 325.6
+        outputKw < 200.0 -> 348.4
+        else -> 393.1
+    }
+
+    /**
+     * 실측 최대 전력으로 "실제로 꽂았던 충전기의 정격 출력"을 고른다.
+     * 실측은 항상 정격보다 낮게 나오므로(200kW기에서 175kW 등) 정격 후보 중
+     * 실측의 93% 이상인 가장 작은 값을 고른다. 후보가 없으면(=출력 정보 없음) 실측값 그대로.
+     */
+    fun ratedOutputFor(outputsCsv: String?, measuredMaxKw: Double): Double {
+        val cands = outputsCsv?.split(',')
+            ?.mapNotNull { it.trim().toDoubleOrNull() }
+            ?.filter { it > 0.0 }
+            ?.sorted()
+        if (cands == null || cands.isEmpty()) return measuredMaxKw
+        val need = measuredMaxKw * 0.93
+        return cands.firstOrNull { it >= need } ?: cands.last()
     }
 
     /** 백그라운드에서 충전소 식별. 콜백은 워커 스레드에서 호출됨 */
@@ -57,16 +97,21 @@ object EvStations {
     private fun resolve(context: Context, lat: Double, lon: Double): Found? {
         val db = Db.get(context)
         val prof = db.nearestStationProfile(lat, lon, PROFILE_RADIUS_M)
-        if (prof != null) {
-            Log.i(TAG, "profile hit: ${prof.name}")
-            return Found(prof.name, prof.operator, prof.rate)
+        // 출력 정보까지 있는 프로필이면 API 없이 끝. (v3 이전에 저장된 프로필은 출력이 없어
+        //  한 번 더 API를 불러 채운다 — 그 다음부터는 다시 API 없이 인식된다)
+        if (prof != null && prof.outputs != null) {
+            Log.i(TAG, "profile hit: ${prof.name} [${prof.outputs}kW]")
+            return Found(prof.name, prof.operator, prof.rate, prof.outputs)
         }
-        if (API_KEY_ENC.isEmpty()) return null // 키 미설정 시 충전소 식별 생략
-        val zcode = zcodeOf(lat, lon) ?: return null
-        val hit = queryNearest(zcode, lat, lon) ?: return null
-        Log.i(TAG, "api hit: ${hit.name} (${hit.operator})")
-        db.upsertStationProfile(hit.lat, hit.lon, hit.name, hit.operator, null)
-        return Found(hit.name, hit.operator, null)
+        val zcode = zcodeOf(lat, lon)
+        val hit = if (zcode != null) queryNearest(zcode, lat, lon) else null
+        if (hit == null) {
+            // API 실패/범위 밖 — 출력 없는 기존 프로필이라도 있으면 그걸로 인식만 한다
+            return prof?.let { Found(it.name, it.operator, it.rate, null) }
+        }
+        Log.i(TAG, "api hit: ${hit.name} (${hit.operator}) [${hit.outputs}kW]")
+        db.upsertStationProfile(hit.lat, hit.lon, hit.name, hit.operator, null, hit.outputs)
+        return Found(hit.name, hit.operator, prof?.rate, hit.outputs)
     }
 
     private class Box(val zcode: String, val latMin: Double, val latMax: Double,
@@ -97,10 +142,28 @@ object EvStations {
     private fun zcodeOf(lat: Double, lon: Double): String? =
         BOXES.firstOrNull { lat in it.latMin..it.latMax && lon in it.lonMin..it.lonMax }?.zcode
 
-    /** 해당 시도의 충전기 목록을 페이지 단위로 훑어 반경 내 최근접 충전소를 찾는다 */
+    /** 충전소 하나(= statNm 하나)에 속한 충전기들을 모은 집계 */
+    private class Agg(val name: String, val lat: Double, val lon: Double) {
+        var operator: String? = null
+        var dist = Double.MAX_VALUE
+        val outputs = java.util.TreeSet<Int>()   // 정격 출력(kW) 오름차순, 중복 제거
+    }
+
+    /**
+     * 해당 시도의 충전기 목록을 페이지 단위로 훑어 반경 내 최근접 충전소를 찾는다.
+     * 충전소는 충전기 여러 대를 갖고 있으므로 statNm 단위로 묶어 정격 출력 목록까지 모은다.
+     */
     private fun queryNearest(zcode: String, lat: Double, lon: Double): ApiHit? {
-        var best: ApiHit? = null
-        var bestD = API_RADIUS_M
+        val best = queryAround(zcode, lat, lon, API_RADIUS_M).firstOrNull() ?: return null
+        return ApiHit(
+            best.name, best.operator, best.lat, best.lon,
+            if (best.outputs.isEmpty()) null else best.outputs.joinToString(",")
+        )
+    }
+
+    /** 반경 radiusM 안의 충전소들을 statNm 단위로 묶어 거리순으로 */
+    private fun queryAround(zcode: String, lat: Double, lon: Double, radiusM: Double): List<Agg> {
+        val near = HashMap<String, Agg>()
         var totalCount = Int.MAX_VALUE
         var page = 1
         val dist = FloatArray(1)
@@ -113,12 +176,13 @@ object EvStations {
             conn.connectTimeout = 10_000
             conn.readTimeout = 40_000
             try {
-                if (conn.responseCode != 200) return best
+                if (conn.responseCode != 200) break
                 val parser = Xml.newPullParser()
                 parser.setInput(conn.inputStream, "UTF-8")
                 var tag = ""
                 var name: String? = null; var op: String? = null
                 var iLat: Double? = null; var iLon: Double? = null
+                var outKw: Int? = null
                 var event = parser.eventType
                 while (event != XmlPullParser.END_DOCUMENT) {
                     when (event) {
@@ -129,18 +193,30 @@ object EvStations {
                             "busiNm" -> op = parser.text
                             "lat" -> iLat = parser.text.trim().toDoubleOrNull()
                             "lng" -> iLon = parser.text.trim().toDoubleOrNull()
+                            // output = 충전기 정격 출력(kW). 요금 구간 판정의 핵심 값
+                            "output" -> outKw = parser.text.trim().toDoubleOrNull()?.let {
+                                Math.round(it).toInt()
+                            }
                         }
                         XmlPullParser.END_TAG -> {
                             tag = ""
                             if (parser.name == "item") {
-                                if (name != null && iLat != null && iLon != null) {
-                                    Location.distanceBetween(lat, lon, iLat, iLon, dist)
-                                    if (dist[0] <= bestD) {
-                                        bestD = dist[0].toDouble()
-                                        best = ApiHit(name, op, iLat, iLon)
+                                // 클로저에 담기므로 불변 지역변수로 옮겨 받는다
+                                val n = name; val la = iLat; val lo = iLon; val kw = outKw
+                                if (n != null && la != null && lo != null) {
+                                    Location.distanceBetween(lat, lon, la, lo, dist)
+                                    if (dist[0] <= radiusM) {
+                                        var agg = near[n]
+                                        if (agg == null) {
+                                            agg = Agg(n, la, lo)
+                                            near[n] = agg
+                                        }
+                                        if (dist[0] < agg.dist) agg.dist = dist[0].toDouble()
+                                        if (agg.operator == null) agg.operator = op
+                                        if (kw != null && kw > 0) agg.outputs.add(kw)
                                     }
                                 }
-                                name = null; op = null; iLat = null; iLon = null
+                                name = null; op = null; iLat = null; iLon = null; outKw = null
                             }
                         }
                     }
@@ -151,6 +227,7 @@ object EvStations {
             }
             page++
         }
-        return best
+
+        return near.values.sortedBy { it.dist }
     }
 }

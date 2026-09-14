@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 충전 상세 v3 (2026-09-08, 사용자): 라벨 아이콘 + 숫자 카운트업 + 충전소 위치 지도(위) + 충전 타임라인 ChargeStripView(아래).
+     왼쪽 = 충전량 히어로·통계·단가 수정. Activity/오버레이 공용 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -7,38 +9,38 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="60dp"
+        android:layout_height="76dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="24dp">
-        <TextView
+        <ImageView
             android:id="@+id/cd_back"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:gravity="center"
-            android:text="←"
-            android:textSize="24sp"
-            android:textColor="@color/text" />
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_chevron_left"
+            android:tint="@color/text"
+            android:scaleX="1.8"
+            android:scaleY="1.8"
+            android:background="?android:attr/selectableItemBackground"
+            android:contentDescription="뒤로" />
         <TextView
             android:id="@+id/cd_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:textSize="20sp"
+            android:textSize="@dimen/text_title"
             android:fontFamily="sans-serif-medium"
             android:textColor="@color/text" />
         <TextView
             android:id="@+id/cd_type"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="17sp"
+            android:textSize="@dimen/text_body"
             android:fontFamily="sans-serif-medium"
-            android:background="@drawable/bg_chip"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp" />
+            android:paddingStart="16dp"
+            android:paddingEnd="8dp" />
     </LinearLayout>
 
     <LinearLayout
@@ -53,41 +55,37 @@
 
         <!-- 좌측: 충전량 히어로 + 통계 -->
         <LinearLayout
+            android:id="@+id/cd_left"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1.15"
+            android:layout_weight="1"
             android:orientation="vertical"
             android:gravity="center_vertical"
             android:paddingEnd="30dp">
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                style="@style/TdLabel"
                 android:text="충전량"
-                android:textSize="18sp"
-                android:letterSpacing="0.25"
-                android:textColor="@color/text_sub" />
-
+                android:drawableStart="@drawable/ic_st_energy" />
             <TextView
                 android:id="@+id/cd_kwh"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="68sp"
+                android:textSize="@dimen/text_value_xl"
                 android:fontFamily="sans-serif-light"
                 android:textColor="@color/text"
                 android:includeFontPadding="false"
-                android:layout_marginTop="2dp" />
-
+                android:layout_marginTop="4dp" />
             <TextView
                 android:id="@+id/cd_cost"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="30sp"
+                android:textSize="@dimen/text_value_m"
                 android:fontFamily="sans-serif-light"
                 android:textColor="@color/accent"
                 android:includeFontPadding="false"
-                android:layout_marginTop="6dp"
-                android:layout_marginBottom="22dp" />
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="24dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -95,14 +93,12 @@
                 android:orientation="horizontal"
                 android:baselineAligned="false">
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="시간" />
-                    <TextView android:id="@+id/cd_time" style="@style/TdValue"
-                        android:textSize="27sp" />
+                    <TextView style="@style/TdLabel" android:text="시간" android:drawableStart="@drawable/ic_st_time" />
+                    <TextView android:id="@+id/cd_time" style="@style/TdValue" />
                 </LinearLayout>
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="배터리" />
-                    <TextView android:id="@+id/cd_soc" style="@style/TdValue"
-                        android:textSize="27sp" />
+                    <TextView style="@style/TdLabel" android:text="배터리" android:drawableStart="@drawable/ic_st_battery" />
+                    <TextView android:id="@+id/cd_soc" style="@style/TdValue" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -113,50 +109,86 @@
                 android:layout_marginTop="18dp"
                 android:baselineAligned="false">
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="단가" />
-                    <TextView android:id="@+id/cd_rate" style="@style/TdValue"
-                        android:textSize="27sp" />
+                    <TextView style="@style/TdLabel" android:text="단가" android:drawableStart="@drawable/ic_st_won" />
+                    <TextView android:id="@+id/cd_rate" style="@style/TdValue" />
                 </LinearLayout>
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="충전소" />
+                    <TextView style="@style/TdLabel" android:text="충전소" android:drawableStart="@drawable/ic_st_station" />
                     <TextView android:id="@+id/cd_station" style="@style/TdValue"
-                        android:textSize="22sp" />
+                        android:textSize="@dimen/text_body"
+                        android:fontFamily="sans-serif-medium" />
                 </LinearLayout>
             </LinearLayout>
 
             <Button
-                android:id="@+id/cd_edit_rate"
+                android:id="@+id/cd_pick_station"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="22dp"
+                android:layout_height="56dp"
+                android:layout_marginTop="26dp"
                 android:background="@drawable/bg_button_dim"
                 android:textColor="@color/text"
-                android:textSize="17sp"
+                android:textSize="@dimen/text_label"
+                android:fontFamily="sans-serif-medium"
+                android:text="충전소 직접 선택 (지도에서 누르기)" />
+            <Button
+                android:id="@+id/cd_edit_rate"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_button_dim"
+                android:textColor="@color/text"
+                android:textSize="@dimen/text_label"
+                android:fontFamily="sans-serif-medium"
                 android:text="단가 수정 (실제 결제 금액으로)" />
         </LinearLayout>
 
-        <!-- 우측: 충전 속도 프로파일 -->
+        <!-- 우측 (v3, 사용자 2026-09-08): 위 충전소 위치 지도, 아래 충전 타임라인(ChargeStripView) -->
         <LinearLayout
+            android:id="@+id/cd_right"
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_weight="1"
+            android:layout_weight="1.05"
             android:orientation="vertical"
             android:paddingTop="8dp">
 
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="충전 속도 프로파일"
-                android:textSize="18sp"
-                android:letterSpacing="0.1"
-                android:textColor="@color/text_sub" />
-
-            <com.p4log.car.ChargeProfileChartView
-                android:id="@+id/cd_chart"
+                android:id="@+id/cd_map_label"
+                style="@style/TdLabel"
+                android:text="충전소 위치"
+                android:drawableStart="@drawable/ic_st_station" />
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:layout_marginTop="10dp" />
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_card">
+                <WebView
+                    android:id="@+id/cd_map"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent" />
+                <TextView
+                    android:id="@+id/cd_map_empty"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center"
+                    android:text="이 충전의 위치 정보가 없습니다"
+                    android:textSize="@dimen/text_label"
+                    android:textColor="@color/text_sub"
+                    android:visibility="gone" />
+            </FrameLayout>
+
+            <TextView
+                android:id="@+id/cd_chart_label"
+                style="@style/TdLabel"
+                android:text="충전 타임라인 · 진할수록 빠르게"
+                android:drawableStart="@drawable/ic_st_speed"
+                android:layout_marginTop="18dp" />
+            <com.p4log.car.ChargeStripView
+                android:id="@+id/cd_chart"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="0.85"
+                android:layout_marginTop="4dp" />
         </LinearLayout>
     </LinearLayout>
 </LinearLayout>

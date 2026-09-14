@@ -6,8 +6,26 @@ import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
-/** 로컬 저장소 (SQLite, 외부 라이브러리 없음). v2: 충전소 프로필 + charge.station (2026-08-09) */
-class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log.db", null, 2) {
+/**
+ * 로컬 저장소 (SQLite, 외부 라이브러리 없음).
+ * v3: parking.photo_ts 주차 사진 (2026-08-10)
+ * v4: station_profile.outputs 충전기 정격 출력 목록 — 로밍 단가 구간 판정용 (2026-08-18)
+ * v5: trip.regen_kwh 회생제동으로 회수한 에너지 (2026-09-05, 주행 탭 표시용. 서버엔 아직 안 올림)
+ * v6: trip.start_place / end_place 출발·도착 동네 이름 (2026-09-06, 주행 기록 목록용. 서버엔 안 올림)
+ */
+class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log.db", null, 6) {
+
+    /**
+     * 매번 열릴 때 인덱스 보장 (2026-09-08, 기록이 쌓여도 기간 조회가 느려지지 않게).
+     * CREATE INDEX IF NOT EXISTS 라 버전을 올릴 필요가 없다. trip(start_ts): 기간 목록·합계, charge(end_ts): 마지막 충전 시각.
+     */
+    override fun onOpen(db: SQLiteDatabase) {
+        super.onOpen(db)
+        if (!db.isReadOnly) {
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_trip_start ON trip(start_ts)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_charge_end ON charge(end_ts)")
+        }
+    }
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
@@ -24,7 +42,9 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 "start_lat REAL, start_lon REAL," +
                 "end_lat REAL, end_lon REAL," +
                 "polyline TEXT NOT NULL DEFAULT '[]'," +
-                "synced INTEGER NOT NULL DEFAULT 0)"
+                "synced INTEGER NOT NULL DEFAULT 0," +
+                "regen_kwh REAL," +
+                "start_place TEXT, end_place TEXT)"
         )
         db.execSQL(
             "CREATE TABLE charge (" +
@@ -58,7 +78,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 "ts INTEGER NOT NULL," +
                 "lat REAL NOT NULL," +
                 "lon REAL NOT NULL," +
-                "soc REAL)"
+                "soc REAL," +
+                "photo_ts INTEGER)"
         )
         // 기본 소모품 (주기는 설정에서 수정 가능)
         val now = System.currentTimeMillis()
@@ -76,6 +97,24 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
             db.execSQL("ALTER TABLE charge ADD COLUMN st_lat REAL")
             db.execSQL("ALTER TABLE charge ADD COLUMN st_lon REAL")
             db.execSQL(CREATE_STATION_PROFILE)
+        }
+        if (oldVersion < 3) {
+            // v2 → v3: 주차 사진 촬영 시각
+            db.execSQL("ALTER TABLE parking ADD COLUMN photo_ts INTEGER")
+        }
+        // v3 → v4: 충전기 정격 출력 목록.
+        // oldVersion이 1이면 위에서 station_profile을 새 스키마로 막 만들었으므로 ALTER 금지(중복 컬럼)
+        if (oldVersion in 2..3) {
+            db.execSQL("ALTER TABLE station_profile ADD COLUMN outputs TEXT")
+        }
+        if (oldVersion < 5) {
+            // v4 → v5: 회생제동 회수 에너지 (기존 주행은 NULL)
+            db.execSQL("ALTER TABLE trip ADD COLUMN regen_kwh REAL")
+        }
+        if (oldVersion < 6) {
+            // v5 → v6: 출발·도착 동네 이름 (기존 주행은 NULL → 목록에서 볼 때 채운다)
+            db.execSQL("ALTER TABLE trip ADD COLUMN start_place TEXT")
+            db.execSQL("ALTER TABLE trip ADD COLUMN end_place TEXT")
         }
     }
 
@@ -109,7 +148,19 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         if (t.endLon != null) cv.put("end_lon", t.endLon) else cv.putNull("end_lon")
         cv.put("polyline", t.polyline)
         cv.put("synced", 0)
+        if (t.regenKwh != null) cv.put("regen_kwh", t.regenKwh) else cv.putNull("regen_kwh")
+        if (t.startPlace != null) cv.put("start_place", t.startPlace)
+        if (t.endPlace != null) cv.put("end_place", t.endPlace)
         return writableDatabase.insert("trip", null, cv)
+    }
+
+    /** 출발·도착 동네 이름 저장 (PlaceNames가 백그라운드에서 채운다, v6) */
+    fun setTripPlaces(id: Long, start: String?, end: String?) {
+        val cv = ContentValues()
+        if (start != null) cv.put("start_place", start)
+        if (end != null) cv.put("end_place", end)
+        if (cv.size() == 0) return
+        writableDatabase.update("trip", cv, "id = ?", arrayOf(id.toString()))
     }
 
     private fun readTrip(c: Cursor): Trip = Trip(
@@ -134,10 +185,48 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         endLon = if (c.isNull(c.getColumnIndexOrThrow("end_lon"))) null
                  else c.getDouble(c.getColumnIndexOrThrow("end_lon")),
         polyline = c.getString(c.getColumnIndexOrThrow("polyline")),
-        synced = c.getInt(c.getColumnIndexOrThrow("synced")) == 1
+        synced = c.getInt(c.getColumnIndexOrThrow("synced")) == 1,
+        regenKwh = c.getColumnIndex("regen_kwh").let { i ->
+            if (i < 0 || c.isNull(i)) null else c.getDouble(i)
+        },
+        startPlace = c.getColumnIndex("start_place").let { i -> if (i < 0 || c.isNull(i)) null else c.getString(i) },
+        endPlace = c.getColumnIndex("end_place").let { i -> if (i < 0 || c.isNull(i)) null else c.getString(i) }
     )
 
+    /** 최근 주행 N건 (최신순) — 주행 탭의 최근 목록 */
+    fun recentTrips(limit: Int): List<Trip> {
+        val list = ArrayList<Trip>()
+        val c = readableDatabase.rawQuery(
+            "SELECT * FROM trip ORDER BY start_ts DESC LIMIT ?", arrayOf(limit.toString())
+        )
+        c.use { while (it.moveToNext()) list.add(readTrip(it)) }
+        return list
+    }
+
     /** 기간 내 주행 목록 (최신순) */
+    /**
+     * 목록용 가벼운 조회 (2026-09-08): polyline(경로, 주행당 수십~수백 KB)을 빼고 읽는다.
+     * 주행 기록 화면이 한 달·1년·전체 목록을 열 때 쓰고, 경로는 선택한 주행만 tripById로 따로 가져온다.
+     * 반환된 Trip의 polyline은 "" (빈 문자열)이다.
+     */
+    fun tripsBetweenLite(fromTs: Long, toTs: Long): List<Trip> {
+        val list = ArrayList<Trip>()
+        val c = readableDatabase.rawQuery(
+            "SELECT id, start_ts, end_ts, distance_m, energy_kwh, soc_start, soc_end, avg_kmh, max_kmh, " +
+                "start_lat, start_lon, end_lat, end_lon, '' AS polyline, synced, regen_kwh, start_place, end_place " +
+                "FROM trip WHERE start_ts >= ? AND start_ts < ? ORDER BY start_ts DESC",
+            arrayOf(fromTs.toString(), toTs.toString())
+        )
+        c.use { while (it.moveToNext()) list.add(readTrip(it)) }
+        return list
+    }
+
+    /** 경로만 (선택한 주행의 지도용) */
+    fun tripPolyline(id: Long): String? {
+        val c = readableDatabase.rawQuery("SELECT polyline FROM trip WHERE id = ?", arrayOf(id.toString()))
+        c.use { return if (it.moveToFirst()) it.getString(0) else null }
+    }
+
     fun tripsBetween(fromTs: Long, toTs: Long): List<Trip> {
         val list = ArrayList<Trip>()
         val c = readableDatabase.rawQuery(
@@ -186,17 +275,44 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         return list.reversed()
     }
 
-    /** [fromTs, toTs) 주행 합계: [건수, 총거리m, 총에너지kWh] */
+    /** [fromTs, toTs) 주행 합계: [건수, 총거리m, 총에너지kWh, 회생kWh] */
     fun tripTotals(fromTs: Long, toTs: Long): DoubleArray {
         val c = readableDatabase.rawQuery(
-            "SELECT COUNT(*), IFNULL(SUM(distance_m),0), IFNULL(SUM(energy_kwh),0) " +
+            "SELECT COUNT(*), IFNULL(SUM(distance_m),0), IFNULL(SUM(energy_kwh),0), IFNULL(SUM(regen_kwh),0) " +
                 "FROM trip WHERE start_ts >= ? AND start_ts < ?",
             arrayOf(fromTs.toString(), toTs.toString())
         )
         c.use {
-            return if (it.moveToFirst()) doubleArrayOf(it.getDouble(0), it.getDouble(1), it.getDouble(2))
-            else doubleArrayOf(0.0, 0.0, 0.0)
+            return if (it.moveToFirst())
+                doubleArrayOf(it.getDouble(0), it.getDouble(1), it.getDouble(2), it.getDouble(3))
+            else doubleArrayOf(0.0, 0.0, 0.0, 0.0)
         }
+    }
+
+    /** 마지막 충전이 끝났을 때의 배터리 % (없으면 null). 충전 사이클 "N% 사용" 계산용 (2026-09-15) */
+    fun lastChargeSocEnd(): Float? {
+        val c = readableDatabase.rawQuery("SELECT soc_end FROM charge ORDER BY end_ts DESC LIMIT 1", null)
+        c.use { return if (it.moveToFirst() && !it.isNull(0)) it.getFloat(0) else null }
+    }
+
+    /** 최고 전비 주행 (minM 이상 거리, 에너지 있는 것만). 개인 최고 기록 (2026-09-15) */
+    fun bestEffTrip(minM: Double): Trip? {
+        val c = readableDatabase.rawQuery(
+            "SELECT * FROM trip WHERE energy_kwh IS NOT NULL AND energy_kwh > 0.3 AND distance_m >= ? " +
+                "ORDER BY (distance_m / energy_kwh) DESC LIMIT 1", arrayOf(minM.toString()))
+        c.use { return if (it.moveToFirst()) readTrip(it) else null }
+    }
+
+    /** 최장 주행 (2026-09-15) */
+    fun longestTrip(): Trip? {
+        val c = readableDatabase.rawQuery("SELECT * FROM trip ORDER BY distance_m DESC LIMIT 1", null)
+        c.use { return if (it.moveToFirst()) readTrip(it) else null }
+    }
+
+    /** 마지막 충전이 끝난 시각 (없으면 null). 회생 "마지막 충전 이후" 사이클의 기준점 (2026-09-08) */
+    fun lastChargeEndTs(): Long? {
+        val c = readableDatabase.rawQuery("SELECT MAX(end_ts) FROM charge", null)
+        c.use { return if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else null }
     }
 
     // ---------- Charge ----------
@@ -338,6 +454,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                    else c.getString(c.getColumnIndexOrThrow("operator")),
         rate = if (c.isNull(c.getColumnIndexOrThrow("rate"))) null
                else c.getDouble(c.getColumnIndexOrThrow("rate")),
+        outputs = if (c.isNull(c.getColumnIndexOrThrow("outputs"))) null
+                  else c.getString(c.getColumnIndexOrThrow("outputs")),
         updatedTs = c.getLong(c.getColumnIndexOrThrow("updated_ts"))
     )
 
@@ -357,13 +475,17 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         return best
     }
 
-    /** 60m 내 기존 프로필이 있으면 갱신, 없으면 생성. rate가 null이면 기존 rate 유지 */
-    fun upsertStationProfile(lat: Double, lon: Double, name: String, operator: String?, rate: Double?) {
+    /** 60m 내 기존 프로필이 있으면 갱신, 없으면 생성. null로 넘긴 항목은 기존 값을 유지한다 */
+    fun upsertStationProfile(
+        lat: Double, lon: Double, name: String, operator: String?, rate: Double?,
+        outputs: String? = null
+    ) {
         val existing = nearestStationProfile(lat, lon, 60.0)
         val cv = ContentValues()
         cv.put("name", name)
         if (operator != null) cv.put("operator", operator)
         if (rate != null) cv.put("rate", rate)
+        if (outputs != null) cv.put("outputs", outputs)
         cv.put("updated_ts", System.currentTimeMillis())
         if (existing != null) {
             writableDatabase.update("station_profile", cv, "id = ?", arrayOf(existing.id.toString()))
@@ -372,6 +494,13 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
             cv.put("lon", lon)
             writableDatabase.insert("station_profile", null, cv)
         }
+    }
+
+    /** 사용자가 고른 충전소를 충전 기록에 기록 (이름 + 충전소 좌표). 재업로드 대상 (2026-09-08) */
+    fun setChargeStation(id: Long, name: String, lat: Double, lon: Double) {
+        val cv = ContentValues()
+        cv.put("station", name); cv.put("st_lat", lat); cv.put("st_lon", lon); cv.put("synced", 0)
+        writableDatabase.update("charge", cv, "id = ?", arrayOf(id.toString()))
     }
 
     /** 충전 기록 단가 수정: 요금 재계산 + 재업로드 대상으로 표시 */
@@ -391,7 +520,17 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         cv.put("lat", p.lat)
         cv.put("lon", p.lon)
         if (p.socPct != null) cv.put("soc", p.socPct) else cv.putNull("soc")
+        if (p.photoTs != null) cv.put("photo_ts", p.photoTs) else cv.putNull("photo_ts")
         writableDatabase.insertWithOnConflict("parking", null, cv, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    /**
+     * 주차 사진 촬영 완료 시각 기록 (비동기 촬영이 끝난 뒤 호출).
+     * @return 갱신된 행 수. 0이면 아직 주차 기록이 없어 사진을 붙일 곳이 없다는 뜻
+     */
+    fun setParkingPhotoTs(ts: Long): Int {
+        val cv = ContentValues(); cv.put("photo_ts", ts)
+        return writableDatabase.update("parking", cv, "id = 1", null)
     }
 
     fun parking(): ParkingInfo? {
@@ -402,7 +541,9 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 lat = it.getDouble(it.getColumnIndexOrThrow("lat")),
                 lon = it.getDouble(it.getColumnIndexOrThrow("lon")),
                 socPct = if (it.isNull(it.getColumnIndexOrThrow("soc"))) null
-                         else it.getFloat(it.getColumnIndexOrThrow("soc"))
+                         else it.getFloat(it.getColumnIndexOrThrow("soc")),
+                photoTs = if (it.isNull(it.getColumnIndexOrThrow("photo_ts"))) null
+                          else it.getLong(it.getColumnIndexOrThrow("photo_ts"))
             ) else null
         }
     }
@@ -416,6 +557,7 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 "name TEXT NOT NULL," +
                 "operator TEXT," +
                 "rate REAL," +
+                "outputs TEXT," +
                 "updated_ts INTEGER NOT NULL DEFAULT 0)"
 
         @Volatile private var instance: Db? = null

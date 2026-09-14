@@ -1,5 +1,5 @@
 -- ============================================
--- P4 차계부 — Supabase 테이블 생성 SQL
+-- P.Log — Supabase 테이블 생성 SQL
 -- Supabase 대시보드 → SQL Editor 에 전체 붙여넣기 → Run
 -- ============================================
 
@@ -21,6 +21,9 @@ create table if not exists trip (
   end_lat double precision,
   end_lon double precision,
   polyline text,
+  regen_kwh double precision,
+  start_place text,
+  end_place text,
   unique (device_id, client_id)
 );
 
@@ -45,14 +48,31 @@ create table if not exists charge (
 -- v2 (2026-08-09): 기존 서버에 적용할 때는 아래 한 줄만 실행하면 됨
 -- alter table charge add column if not exists station text;
 
+-- v4 (2026-09-13): 회생 회수 kWh + 출발·도착 동네 이름. 기존 서버에는 아래 3줄만 실행하면 됨
+-- alter table trip add column if not exists regen_kwh double precision;
+-- alter table trip add column if not exists start_place text;
+-- alter table trip add column if not exists end_place text;
+
 -- 주차 위치 (차량당 1행)
 create table if not exists parking (
   device_id text primary key,
   ts bigint not null,
   lat double precision not null,
   lon double precision not null,
-  soc double precision
+  soc double precision,
+  photo_ts bigint
 );
+
+-- v3 (2026-08-10): 주차 사진. 기존 서버에는 아래 블록만 실행하면 됨
+-- alter table parking add column if not exists photo_ts bigint;
+-- insert into storage.buckets (id, name, public) values ('parking', 'parking', true)
+--   on conflict (id) do nothing;
+-- create policy "parking photo write" on storage.objects
+--   for insert to anon with check (bucket_id = 'parking');
+-- create policy "parking photo update" on storage.objects
+--   for update to anon using (bucket_id = 'parking');
+-- create policy "parking photo read" on storage.objects
+--   for select to anon using (bucket_id = 'parking');
 
 -- 소모품 현황 스냅샷
 create table if not exists consumable (

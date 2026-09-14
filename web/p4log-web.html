@@ -2,170 +2,364 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
 <title>P.Log</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
+  /* ============================================================
+     P.Log 웹/폰 v2 (2026-09-13, 사용자: "폰 앱도 개편한 UI에 맞게 모바일 스타일로")
+     차량 앱 v9 문법 그대로: 순흑 배경, 박스·테두리 없음, 헤어라인만, 아이콘 라벨 + 가는 큰 숫자,
+     주황 포인트, 아래 탭바(주행 / 충전 / 차량), 기간 탭, 숫자 카운트업, 상세는 아래에서 올라오는 시트.
+     글꼴 체계(폰): small 12 / label 13.5 / body 16 / title 22 / value_m 26 / value_l 34 / value_xl 46
+     ============================================================ */
   :root {
-    --bg:#0E0E10; --card:#1A1B1E; --line:#2A2B30;
-    --text:#ECECEC; --sub:#9A9AA0; --muted:#6A6B70;
-    --dc:#E86A00; --ac:#3D8BE8; --accent:#E86A00; --green:#3ECF6E;
+    --bg:#000000; --card:#141414; --line:#232326; --line2:#26262A;
+    --text:#F2F2F2; --sub:#C9C9CE; --muted:#8E8E93;
+    --dc:#FF7500; --ac:#4DA3FF; --accent:#FF7500; --green:#3ECF6E; --red:#FF5C5C; --dim:#5A5A60;
   }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--text);
-    font-family:-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;
-    padding:20px; max-width:1080px; margin:0 auto; }
-  h1 { font-size:22px; }
-  h2 { font-size:15px; color:var(--sub); font-weight:600; margin-bottom:10px; }
-  header { display:flex; align-items:baseline; gap:12px; margin-bottom:18px; flex-wrap:wrap; }
-  header .sub { color:var(--sub); font-size:13px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
-    padding:16px; margin-bottom:16px; }
-  /* 스탯 타일 */
-  .tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-    gap:12px; margin-bottom:16px; }
-  .tile { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
-  .tile .k { font-size:13px; color:var(--sub); }
-  .tile .v { font-size:24px; font-weight:700; margin-top:4px; }
-  .tile .u { font-size:13px; color:var(--sub); font-weight:400; }
-  /* 차트 */
-  .charts { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  @media (max-width:760px){ .charts { grid-template-columns:1fr; } }
-  .chart-wrap { position:relative; height:180px; }
-  .legend { display:flex; gap:14px; font-size:12px; color:var(--sub); margin-top:8px; }
-  .legend .sw { display:inline-block; width:10px; height:10px; border-radius:3px;
-    margin-right:5px; vertical-align:-1px; }
-  #tooltip { position:fixed; display:none; background:#232428; border:1px solid var(--line);
-    border-radius:8px; padding:8px 10px; font-size:12px; color:var(--text);
-    pointer-events:none; z-index:99; white-space:pre; box-shadow:0 4px 14px rgba(0,0,0,.5); }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html, body { background:var(--bg); color:var(--text); }
+  body { font-family:-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif; font-size:16px; line-height:1.35; }
+  button { font-family:inherit; }
+  #app { max-width:720px; margin:0 auto; padding-bottom:calc(72px + env(safe-area-inset-bottom)); }
+  /* 상단 */
+  .top { display:flex; align-items:baseline; gap:10px; padding:18px 20px 6px; }
+  .top .brand { font-size:22px; font-weight:600; letter-spacing:.5px; }
+  .top .sub { color:var(--muted); font-size:13px; }
+  .top .sub.right { margin-left:auto; }
+  /* 공통 */
+  .tab { display:none; padding:0 20px; }
+  .tab.on { display:block; animation:rise .24s ease-out; }
+  @keyframes rise { from { opacity:0; transform:translateY(14px);} to { opacity:1; transform:none;} }
+  .hair { height:1px; background:var(--line); margin:14px 0; }
+  .lbl { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:13.5px; letter-spacing:.3px; }
+  .lbl .ic { width:18px; height:18px; flex:none; }
+  .ic { display:inline-block; vertical-align:-3px; }
+  .val { font-weight:300; font-size:26px; margin-top:4px; letter-spacing:-.3px; white-space:nowrap; }
+  .val u { text-decoration:none; color:var(--muted); font-size:.5em; margin-left:3px; }
+  .val.l { font-size:34px; }
+  .val.xl { font-size:46px; line-height:1.05; }
+  .val.accent { color:var(--accent); } .val.green { color:var(--green); } .val.warn { color:#FF8A80; }
+  .statline { display:flex; align-items:center; gap:8px; color:var(--sub); font-size:14px; margin:10px 0 14px; }
+  .statline .dot { width:8px; height:8px; border-radius:50%; background:var(--dim); flex:none; }
+  .statline .dot.live { background:var(--accent); animation:pulse 1.6s ease-in-out infinite; }
+  .statline .dot.chg { background:var(--green); animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { transform:scale(1); opacity:1;} 50% { transform:scale(1.6); opacity:.45;} }
+  /* 히어로 */
+  .hero3 { display:grid; grid-template-columns:1fr 1fr; gap:14px 10px; }
+  .hero3 .val { font-size:34px; }
+  .hero3 .cell:first-child { grid-column:1 / -1; }
+  .hero3 .cell:first-child .val { font-size:52px; line-height:1.05; }
+  .lbl span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hdrow { display:flex; flex-wrap:wrap; gap:6px 18px; color:var(--muted); font-size:13.5px; margin-top:16px; }
+  .hdrow b { color:var(--text); font-weight:500; margin-left:5px; }
+  /* 기간 탭 + 이동 */
+  .periodbar { display:flex; align-items:center; gap:8px; margin:6px 0 4px; }
+  .ptabs { display:flex; gap:2px; flex:1; overflow-x:auto; scrollbar-width:none; }
+  .ptabs::-webkit-scrollbar { display:none; }
+  .ptabs span { padding:8px 10px; font-size:14px; font-weight:500; color:var(--sub); border-radius:2px; white-space:nowrap; cursor:pointer; }
+  .ptabs span.on { color:var(--accent); background:rgba(255,117,0,.15); }
+  .pnav { display:flex; align-items:center; gap:4px; }
+  .pnav button { background:#1E1E22; border:none; color:var(--text); width:38px; height:36px; border-radius:2px; font-size:20px; cursor:pointer; }
+  .pnav button:active { background:#2C2C31; }
+  .pnav button.hide { visibility:hidden; }
+  .ptitle { font-size:15px; font-weight:500; min-width:88px; text-align:center; }
+  /* 요약 격자 */
+  .sum { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 10px; margin:12px 0 4px; }
+  .sum .val { font-size:22px; }
+  .sum3 { display:grid; grid-template-columns:1.1fr 1fr .9fr; gap:10px; margin:12px 0 4px; }
+  .sum3 .val { font-size:30px; }
+  /* 급속/완속 띠 */
+  .split { display:flex; height:5px; margin-top:14px; gap:3px; }
+  .split i { display:block; height:100%; transition:flex .4s ease; }
+  .split .dc { background:var(--dc); } .split .ac { background:var(--ac); }
+  .splitlbl { display:flex; justify-content:space-between; font-size:13px; margin-top:6px; }
+  .splitlbl .a { color:var(--dc);} .splitlbl .b { color:var(--ac);}
   /* 목록 */
-  .row { display:flex; align-items:center; gap:12px; padding:10px 4px;
-    border-bottom:1px solid var(--line); font-size:14px; cursor:default; }
-  .row:last-child { border-bottom:none; }
-  .row .grow { flex:1; }
-  .row .big { font-weight:700; }
-  .row .dim { color:var(--sub); font-size:12.5px; }
-  .badge { font-size:11px; font-weight:700; border-radius:5px; padding:2px 7px; }
-  .badge.DC { background:rgba(232,106,0,.16); color:#FF9E52; }
-  .badge.AC { background:rgba(61,139,232,.16); color:#7FBCFF; }
-  .clickable { cursor:pointer; }
-  .clickable:hover { background:#202126; border-radius:8px; }
-  .monthnav { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-  .monthnav button { background:#232428; color:var(--text); border:1px solid var(--line);
-    border-radius:8px; width:36px; height:32px; font-size:14px; cursor:pointer; }
-  .monthnav .title { font-weight:700; }
-  #map, #tripmap { height:300px; border-radius:10px; }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  @media (max-width:760px){ .grid2 { grid-template-columns:1fr; } }
-  .empty { color:var(--muted); font-size:13.5px; padding:14px 4px; }
+  .row { display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  .row:active { background:#111; }
+  .row .grow { flex:1; min-width:0; }
+  .row .t { font-size:16px; font-weight:500; }
+  .row .s { color:var(--sub); font-size:13.5px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row .r { text-align:right; white-space:nowrap; }
+  .row .big { font-size:24px; font-weight:300; }
+  .row .big.accent { color:var(--accent); }
+  .row .won { color:var(--accent); font-size:13.5px; margin-top:1px; }
+  .row .dotc { width:9px; height:9px; border-radius:50%; flex:none; }
+  .row .dotc.DC { background:var(--dc);} .row .dotc.AC { background:var(--ac);}
+  .row .regen { color:var(--green); font-size:13.5px; }
+  .sec { margin-top:22px; }
+  .sec .lbl { margin-bottom:8px; }
+  .empty { display:flex; flex-direction:column; align-items:center; gap:12px; color:var(--muted); font-size:14px;
+    padding:34px 0 24px; text-align:center; line-height:1.6; }
+  .empty .ic { width:30px; height:30px; color:var(--dim); }
+  .morebtn { display:none; width:100%; margin-top:10px; background:#1E1E22; color:var(--text); border:none;
+    border-radius:2px; padding:13px 8px; font-size:15px; font-weight:500; cursor:pointer; }
+  .morebtn:active { background:#2C2C31; }
+  /* 차트 */
+  .chart-wrap { position:relative; height:170px; margin-top:6px; }
+  .legend { display:flex; gap:14px; font-size:12px; color:var(--sub); margin-top:6px; }
+  .legend .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  #tooltip { position:fixed; display:none; background:#232428; border:1px solid var(--line2); border-radius:6px;
+    padding:8px 10px; font-size:12px; color:var(--text); pointer-events:none; z-index:99; white-space:pre; }
+  /* 지도 */
+  #map, #tripmap { height:240px; border-radius:2px; position:relative; z-index:0; background:#141414; }
+  #park-photo { display:none; width:100%; border-radius:2px; margin-top:10px; }
+  /* 소모품 */
+  .cons { padding:14px 0; border-bottom:1px solid var(--line); }
+  .cons .h { display:flex; align-items:baseline; gap:10px; }
+  .cons .h .n { font-size:16px; font-weight:500; flex:1; }
+  .cons .h .st { font-size:13.5px; font-weight:500; color:var(--muted); }
+  .cons .h .rm { font-size:22px; font-weight:300; }
+  .cons .d { color:var(--sub); font-size:13.5px; margin-top:3px; }
+  .cons .bar { height:5px; background:#232326; border-radius:2px; margin-top:10px; overflow:hidden; }
+  .cons .bar i { display:block; height:100%; background:#F2F2F2; border-radius:2px; transition:width .5s ease; }
+  /* 아래 탭바 */
+  .tabbar { position:fixed; left:0; right:0; bottom:0; height:calc(64px + env(safe-area-inset-bottom)); padding-bottom:env(safe-area-inset-bottom);
+    background:rgba(0,0,0,.94); backdrop-filter:blur(8px); border-top:1px solid var(--line); display:flex; z-index:50; }
+  .tabbar div { flex:1; display:flex; align-items:center; justify-content:center; }
+  .tabbar span { display:flex; align-items:center; gap:7px; padding:8px 16px; border-radius:2px; color:var(--sub); font-size:15px; font-weight:500; cursor:pointer; }
+  .tabbar span .ic { width:20px; height:20px; }
+  .tabbar span.on { color:var(--accent); background:rgba(255,117,0,.15); }
   /* 설정 화면 */
-  #setup { max-width:520px; margin:60px auto; }
-  #setup input { width:100%; background:#232428; border:1px solid var(--line); color:var(--text);
-    border-radius:8px; padding:10px 12px; font-size:14px; margin:6px 0 14px; }
-  #setup label { font-size:13px; color:var(--sub); }
-  #setup button { width:100%; background:var(--accent); border:none; color:#fff; font-weight:700;
-    padding:12px; border-radius:10px; font-size:15px; cursor:pointer; }
+  #setup { max-width:520px; margin:60px auto; padding:0 20px; }
+  #setup input { width:100%; background:transparent; border:none; border-bottom:1px solid var(--line2); color:var(--text);
+    padding:10px 2px; font-size:16px; margin:4px 0 16px; outline:none; }
+  #setup input:focus { border-color:var(--accent); }
+  #setup label { font-size:13.5px; color:var(--muted); }
+  #setup button { width:100%; background:var(--accent); border:none; color:#fff; font-weight:600; padding:14px; border-radius:2px; font-size:16px; cursor:pointer; }
   #err { color:#FF7B7B; font-size:13px; margin-top:10px; min-height:18px; }
-  /* 모달 */
-  #modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:50;
-    align-items:center; justify-content:center; padding:20px; }
-  #modal .inner { background:var(--card); border:1px solid var(--line); border-radius:14px;
-    padding:16px; width:min(760px,100%); }
-  #modal .head { display:flex; justify-content:space-between; margin-bottom:10px; }
-  #modal .close { cursor:pointer; color:var(--sub); font-size:20px; }
+  /* 시트(상세) */
+  .sheet { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:1000; align-items:flex-end; justify-content:center; }
+  .sheet.on { display:flex; }
+  .sheet .inner { background:#0A0A0B; width:min(720px,100%); max-height:94vh; overflow-y:auto; border-radius:10px 10px 0 0;
+    padding:8px 20px calc(24px + env(safe-area-inset-bottom)); animation:up .28s ease-out; border-top:1px solid var(--line2); }
+  @keyframes up { from { transform:translateY(40px); opacity:0;} to { transform:none; opacity:1;} }
+  .sheet .grip { width:40px; height:4px; background:#3A3A3E; border-radius:2px; margin:6px auto 12px; }
+  .sheet .head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .sheet .head b { font-size:19px; font-weight:500; flex:1; }
+  .sheet .close { width:40px; height:40px; display:flex; align-items:center; justify-content:center; color:var(--sub); font-size:22px; cursor:pointer; border-radius:2px; background:#1E1E22; }
+  .typetxt { font-size:14px; font-weight:500; }
+  .typetxt.DC { color:var(--dc);} .typetxt.AC { color:var(--ac);}
+  .dgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 8px; margin:16px 0; }
+  .dgrid .val { font-size:20px; }
+  .dgrid .val.sm { font-size:16px; font-weight:500; margin-top:6px; }
+  #route-legend { color:var(--sub); font-size:12.5px; margin-top:8px; }
+  .chart-wrap2 { height:220px; margin-top:6px; }
+  .ps-login input { width:100%; background:transparent; border:none; border-bottom:1px solid var(--line2); color:var(--text);
+    padding:10px 2px; font-size:16px; margin-bottom:10px; outline:none; }
 </style>
 </head>
 <body>
 
-<!-- 최초 접속: 연결 정보 입력 (브라우저 메모리/URL 해시에 저장) -->
+<!-- 최초 접속: 연결 정보 입력 (URL 해시에 저장) -->
 <div id="setup">
-  <h1 style="margin-bottom:24px">🔌 P.Log</h1>
+  <h1 style="margin-bottom:24px;font-size:24px;font-weight:600">P.Log</h1>
   <label>Supabase Project URL</label>
   <input id="in-url" placeholder="https://xxxx.supabase.co">
   <label>anon public 키</label>
-  <input id="in-key" placeholder="eyJhbGciOi...">
-  <label>차량 ID (앱 설정과 동일하게)</label>
+  <input id="in-key" placeholder="sb_publishable_...">
+  <label>차량 ID (차량 앱 설정과 동일하게)</label>
   <input id="in-dev" placeholder="p4-123456">
   <button onclick="connect()">불러오기</button>
   <div id="err"></div>
-  <p style="color:var(--muted);font-size:12.5px;margin-top:14px">
+  <p style="color:var(--muted);font-size:12.5px;margin-top:14px;line-height:1.6">
     입력값은 주소창 # 뒤에 저장됩니다. 이 주소를 즐겨찾기하면 다음부터 바로 열립니다.<br>
     (주소를 아는 사람은 기록을 볼 수 있으니 공유하지 마세요)
   </p>
 </div>
 
 <div id="app" style="display:none">
-  <header>
-    <h1>⚡ P.Log</h1>
+  <header class="top">
+    <span class="brand">P.Log</span>
     <span class="sub" id="hd-dev"></span>
-    <span class="sub" id="hd-updated"></span>
+    <span class="sub right" id="hd-updated"></span>
   </header>
 
-  <div class="tiles" id="tiles"></div>
+  <!-- ===== 주행 ===== -->
+  <section id="tab-drive" class="tab on">
+    <div class="statline"><span class="dot" id="d-dot"></span><span id="d-state">불러오는 중…</span></div>
+    <div class="hero3" id="d-hero">
+      <div class="cell"><div class="lbl" id="h1-lbl"></div><div class="val" id="h1"></div></div>
+      <div class="cell"><div class="lbl" id="h2-lbl"></div><div class="val" id="h2"></div></div>
+      <div class="cell"><div class="lbl" id="h3-lbl"></div><div class="val" id="h3"></div></div>
+    </div>
+    <div class="hdrow" id="d-hdrow"></div>
+    <div class="hair"></div>
 
-  <div class="charts">
-    <div class="card">
-      <h2>월별 주행 거리</h2>
+    <div class="periodbar">
+      <div class="ptabs" id="t-ptabs"><span>일간</span><span>주간</span><span class="on">월간</span><span>연간</span><span>전체</span></div>
+      <div class="pnav"><button id="t-prev" onclick="tMove(-1)">‹</button><button id="t-next" onclick="tMove(1)">›</button></div>
+    </div>
+    <div class="ptitle" id="t-period" style="text-align:left;margin:6px 0 0;font-size:18px;font-weight:600"></div>
+    <div class="sum" id="t-sum"></div>
+    <div class="hair"></div>
+    <div id="t-list"></div>
+    <button id="t-more" class="morebtn" onclick="tShowAll()"></button>
+
+    <div class="sec">
+      <div class="lbl" id="km-chart-lbl"></div>
       <div class="chart-wrap"><svg id="chart-km" width="100%" height="100%"></svg></div>
     </div>
-    <div class="card">
-      <h2>월별 충전 비용</h2>
+  </section>
+
+  <!-- ===== 충전 ===== -->
+  <section id="tab-charge" class="tab">
+    <div class="periodbar" style="margin-top:8px">
+      <div class="ptabs" id="c-ptabs"><span>주간</span><span class="on">월간</span><span>연간</span><span>전체</span></div>
+      <div class="pnav"><button id="c-prev" onclick="cMove(-1)">‹</button><button id="c-next" onclick="cMove(1)">›</button></div>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:12px;margin-top:6px">
+      <div id="c-period" style="font-size:18px;font-weight:600"></div>
+      <div id="c-count" style="color:var(--muted);font-size:13.5px"></div>
+    </div>
+    <div class="sum3">
+      <div class="cell"><div class="lbl" id="c-l1"></div><div class="val accent" id="c-cost"></div></div>
+      <div class="cell"><div class="lbl" id="c-l2"></div><div class="val" id="c-kwh"></div></div>
+      <div class="cell"><div class="lbl" id="c-l3"></div><div class="val" id="c-unit"></div></div>
+    </div>
+    <div class="split"><i class="dc" id="c-split-dc"></i><i class="ac" id="c-split-ac"></i></div>
+    <div class="splitlbl"><span class="a" id="c-split-a">급속</span><span class="b" id="c-split-b">완속</span></div>
+    <div class="hair"></div>
+    <div id="c-list"></div>
+    <button id="c-more" class="morebtn" onclick="cShowAll()"></button>
+
+    <div class="sec">
+      <div class="lbl" id="cost-chart-lbl"></div>
       <div class="chart-wrap"><svg id="chart-cost" width="100%" height="100%"></svg></div>
       <div class="legend">
-        <span><span class="sw" style="background:var(--dc)"></span>급속 DC</span>
-        <span><span class="sw" style="background:var(--ac)"></span>완속 AC</span>
+        <span><span class="sw" style="background:var(--dc)"></span>급속</span>
+        <span><span class="sw" style="background:var(--ac)"></span>완속</span>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="grid2">
-    <div class="card">
-      <div class="monthnav">
-        <button onclick="moveMonth(-1)">◀</button>
-        <span class="title" id="month-title"></span>
-        <button onclick="moveMonth(1)">▶</button>
+  <!-- ===== 차량 ===== -->
+  <section id="tab-car" class="tab">
+    <!-- 폴스타 계정: 폰 앱(네이티브 브리지)에서만 보인다. PC 브라우저에서는 CORS 때문에 불가능하므로 숨김 -->
+    <div id="ps-card" style="display:none;margin-top:10px">
+      <div class="lbl" id="ps-lbl"></div>
+      <div id="ps-data" style="font-size:14px;color:var(--sub);margin-top:8px">불러오는 중…</div>
+      <div id="ps-login" class="ps-login" style="display:none;margin-top:10px">
+        <input id="ps-email" placeholder="폴스타 계정 이메일" autocomplete="username">
+        <input id="ps-pw" type="password" placeholder="비밀번호" autocomplete="current-password">
+        <button class="morebtn" style="display:block" onclick="psLogin()">로그인하고 불러오기</button>
       </div>
-      <h2 id="trips-sum"></h2>
-      <div id="trips-list"></div>
-      <h2 style="margin-top:20px" id="charges-sum"></h2>
-      <div id="charges-list"></div>
+      <button id="ps-refresh" class="morebtn" style="display:none;margin-top:10px" onclick="psFetch()">새로고침</button>
+      <div class="hair"></div>
     </div>
 
-    <div>
-      <div class="card">
-        <h2 id="park-title">주차 위치</h2>
-        <div id="map"></div>
-        <div class="dim" id="park-info" style="margin-top:8px;color:var(--sub);font-size:13px"></div>
-      </div>
-      <div class="card">
-        <h2>소모품</h2>
-        <div id="cons-list"></div>
-      </div>
+    <div style="margin-top:10px">
+      <div class="lbl" id="park-lbl"></div>
+      <div class="val" id="park-title" style="font-size:22px;font-weight:500;margin-top:6px">-</div>
+      <div id="park-info" style="color:var(--sub);font-size:13.5px;margin:2px 0 10px"></div>
+      <div id="map"></div>
+      <img id="park-photo" alt="주차 사진">
+      <div id="park-photo-note" style="margin-top:8px;color:var(--muted);font-size:13px"></div>
     </div>
-  </div>
+    <div class="hair"></div>
+    <div class="lbl" id="cons-lbl"></div>
+    <div id="cons-list"></div>
+  </section>
+
+  <nav class="tabbar">
+    <div><span id="nav-drive" class="on" onclick="showTab('drive')"></span></div>
+    <div><span id="nav-charge" onclick="showTab('charge')"></span></div>
+    <div><span id="nav-car" onclick="showTab('car')"></span></div>
+  </nav>
 </div>
 
-<div id="modal"><div class="inner">
+<!-- 주행 상세 시트 -->
+<div id="modal" class="sheet" onclick="if(event.target===this)closeModal()"><div class="inner">
+  <div class="grip"></div>
   <div class="head"><b id="modal-title"></b><span class="close" onclick="closeModal()">✕</span></div>
+  <div class="lbl" id="td-hero-label"></div>
+  <div class="val xl accent" id="td-hero"></div>
+  <div id="td-place" style="color:var(--sub);font-size:14px;margin-top:6px"></div>
+  <div class="dgrid" id="modal-grid"></div>
   <div id="tripmap"></div>
+  <div id="route-legend" style="display:none">
+    경로 색 (km/kWh): <span style="color:#3ECF6E">■</span> 6+ ·
+    <span style="color:#FFB020">■</span> 4~6 ·
+    <span style="color:#FF5C5C">■</span> 4 미만 ·
+    <span style="color:#4DA3FF">■</span> 회생
+  </div>
+  <div class="lbl" id="td-chart-label" style="margin-top:18px"></div>
+  <div class="chart-wrap2"><svg id="trip-eff" width="100%" height="100%"></svg></div>
+</div></div>
+
+<!-- 충전 상세 시트 -->
+<div id="cmodal" class="sheet" onclick="if(event.target===this)closeCModal()"><div class="inner">
+  <div class="grip"></div>
+  <div class="head"><b id="cmodal-title"></b><span id="cmodal-type" class="typetxt"></span><span class="close" onclick="closeCModal()">✕</span></div>
+  <div class="lbl" id="cd-hero-label"></div>
+  <div class="val xl" id="cd-hero"></div>
+  <div class="val accent" id="cd-cost" style="font-size:26px;margin-top:2px"></div>
+  <div class="dgrid" id="cmodal-grid"></div>
+  <div class="lbl" id="cd-chart-label"></div>
+  <div class="chart-wrap2"><svg id="charge-profile" width="100%" height="100%"></svg></div>
 </div></div>
 
 <div id="tooltip"></div>
 
 <script>
 "use strict";
-let sb = null, DEV = "", curMonth = new Date();
-curMonth.setDate(1);
+let sb = null, DEV = "", BASEURL = "";
+
+/* ---------- 자체 아이콘 (차량 앱 ic_st_* 와 같은 선 아이콘) ---------- */
+const IC = {
+  dist: ["M5,18 C10.5,18 13.5,6.5 18.5,6.5","M5,18 m-2.2,0 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0","M18.5,6.5 m-2.6,0 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0"],
+  time: ["M12,12 m-8.5,0 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0","M12,7.2 L12,12 L15.6,14.2"],
+  eff: ["M5,20 C5,12 9.5,5.5 19.5,4 C19,13.5 14,19.5 6,20 Z","M5,20 C8,15 11,11 16,7.5","M10.5,12.8 L13.8,13.2 M8.2,16 L11.6,16.6"],
+  energy: ["M13.2,2.5 L5,13.2 L11,13.2 L10.2,21.5 L19,10.6 L13,10.6 Z"],
+  battery: ["M3.5,8 H17.5 A1.5,1.5 0 0,1 19,9.5 V14.5 A1.5,1.5 0 0,1 17.5,16 H3.5 A1.5,1.5 0 0,1 2,14.5 V9.5 A1.5,1.5 0 0,1 3.5,8 Z","M20.5,10.5 V13.5","F:M4.5,10.3 H10.5 V13.7 H4.5 Z"],
+  regen: ["M19.5,12 A7.5,7.5 0 1,1 14.2,4.8","M13.5,1.8 L16.8,4.8 L13.5,7.8","M12.6,9.6 L10.4,13 L13.2,13 L11.4,16.4"],
+  log: ["M8,6.5 H20 M8,12 H20 M8,17.5 H20","F:M4.2,6.5 m-1.4,0 a1.4,1.4 0 1,0 2.8,0 a1.4,1.4 0 1,0 -2.8,0 M4.2,12 m-1.4,0 a1.4,1.4 0 1,0 2.8,0 a1.4,1.4 0 1,0 -2.8,0 M4.2,17.5 m-1.4,0 a1.4,1.4 0 1,0 2.8,0 a1.4,1.4 0 1,0 -2.8,0"],
+  speed: ["M4,17.5 A9,9 0 1,1 20,17.5","M12,17.5 L16.5,10.5","F:M12,17.5 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0"],
+  speedAvg: ["M4,17.5 A9,9 0 1,1 20,17.5","M12,17.5 L12,9.5","F:M12,17.5 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0"],
+  speedMax: ["M4,17.5 A9,9 0 1,1 20,17.5","M12,17.5 L18.2,12.2","F:M12,17.5 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0"],
+  won: ["M12,12 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0","M7.2,8 L9.2,16 L12,9.5 L14.8,16 L16.8,8","M6.8,11.4 H17.2 M7.4,13.6 H16.6"],
+  station: ["M12,21.5 C12,21.5 5,14.8 5,9.8 A7,7 0 0,1 19,9.8 C19,14.8 12,21.5 12,21.5 Z","M12.8,5.6 L9.6,10.4 L12.2,10.4 L11.4,14.2 L14.6,9.4 L12,9.4 Z"],
+  parking: ["M12,21.5 C12,21.5 5,14.8 5,9.8 A7,7 0 0,1 19,9.8 C19,14.8 12,21.5 12,21.5 Z","M10.2,13.6 V6.4 H12.9 A2.1,2.1 0 0,1 12.9,10.6 H10.2"],
+  compare: ["M3.5,20.5 H20.5","M6.5,20.5 V13 H10.5 V20.5","M13.5,20.5 V8 H17.5 V20.5","M15.5,2.8 V5.6 M13.4,4.6 L15.5,2.5 L17.6,4.6"],
+  range: ["M4,20 L9,4 M20,20 L15,4 M12,6.5 V9 M12,12 V14.5 M12,17.5 V20"],
+  car: ["M4,13 L6,7.5 H18 L20,13 V18 H4 Z","M4,13 H20","F:M7,15.5 m-1.3,0 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0 M17,15.5 m-1.3,0 a1.3,1.3 0 1,0 2.6,0 a1.3,1.3 0 1,0 -2.6,0","M6,18 V20 M18,18 V20"]
+};
+function ic(name, size) {
+  const s = size || 18;
+  const paths = (IC[name] || []).map(p => p.startsWith("F:")
+    ? `<path d="${p.slice(2)}" fill="currentColor" stroke="none"/>`
+    : `<path d="${p}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`).join("");
+  return `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24">${paths}</svg>`;
+}
+function setLbl(id, icon, text) { const el = document.getElementById(id); if (el) el.innerHTML = ic(icon) + `<span>${text}</span>`; }
+
+/* ---------- 숫자 카운트업 (차량 앱 NumberTween과 같은 느낌, 260ms) ---------- */
+const shown = {};
+function tween(id, value, fmt, placeholder) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (value == null || isNaN(value)) { shown[id] = null; el.innerHTML = placeholder || "-"; return; }
+  const from = shown[id];
+  shown[id] = value;
+  if (from == null || !isFinite(from) || Math.abs(from - value) < 1e-9) { el.innerHTML = fmt(value); return; }
+  const t0 = performance.now();
+  const step = now => {
+    const f = Math.min(1, (now - t0) / 260), e = 1 - Math.pow(1 - f, 2.2);
+    el.innerHTML = fmt(from + (value - from) * e);
+    if (f < 1 && shown[id] === value) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+const big = (v, unit) => `${v}<u>${unit}</u>`;
 
 /* ---------- 연결 ---------- */
 function loadHash() {
-  try {
-    const h = location.hash.slice(1);
-    if (!h) return null;
-    return JSON.parse(decodeURIComponent(h));
-  } catch (e) { return null; }
+  try { const h = location.hash.slice(1); if (!h) return null; return JSON.parse(decodeURIComponent(h)); }
+  catch (e) { return null; }
 }
 function connect() {
   const url = document.getElementById("in-url").value.trim().replace(/\/+$/,"");
@@ -177,250 +371,654 @@ function connect() {
 }
 async function init(url, key, dev) {
   sb = window.supabase.createClient(url, key);
-  DEV = dev;
+  DEV = dev; BASEURL = url;
   const test = await sb.from("trip").select("client_id").limit(1);
-  if (test.error) {
-    document.getElementById("err").textContent = "연결 실패: " + test.error.message;
-    return;
-  }
+  if (test.error) { document.getElementById("err").textContent = "연결 실패: " + test.error.message; return; }
   document.getElementById("setup").style.display = "none";
   document.getElementById("app").style.display = "block";
   document.getElementById("hd-dev").textContent = dev;
-  await Promise.all([loadTiles(), loadCharts(), loadMonth(), loadParking(), loadConsumables()]);
+  // 고정 라벨
+  setLbl("km-chart-lbl", "dist", "월별 주행 거리");
+  setLbl("cost-chart-lbl", "won", "월별 충전 요금");
+  setLbl("c-l1", "won", "충전 요금"); setLbl("c-l2", "energy", "충전량"); setLbl("c-l3", "station", "kWh당");
+  setLbl("ps-lbl", "car", "차량 상태 · 폴스타 계정");
+  setLbl("park-lbl", "parking", "주차 위치");
+  setLbl("cons-lbl", "log", "소모품");
+  setLbl("td-hero-label", "dist", "거리"); setLbl("td-chart-label", "eff", "전비 비교 · 최근 주행 vs 이번 주행");
+  setLbl("cd-hero-label", "energy", "충전량"); setLbl("cd-chart-label", "speed", "충전 속도 곡선");
+  document.getElementById("nav-drive").innerHTML = ic("dist", 20) + "주행";
+  document.getElementById("nav-charge").innerHTML = ic("energy", 20) + "충전";
+  document.getElementById("nav-car").innerHTML = ic("car", 20) + "차량";
+  await Promise.all([loadTrips(), loadCharges()]);
+  renderHero();
+  tRender(); cRender();
+  loadCharts();
+  loadParking(); loadConsumables();
+  psInit();   // 폰 앱에서만 동작 (네이티브 브리지가 있을 때)
+}
+
+/* ---------- 탭 ---------- */
+function showTab(name) {
+  for (const n of ["drive","charge","car"]) {
+    document.getElementById("tab-" + n).classList.toggle("on", n === name);
+    document.getElementById("nav-" + n).classList.toggle("on", n === name);
+  }
+  if (name === "car" && parkMap) setTimeout(() => parkMap.invalidateSize(), 50);
+  if (name !== "drive" && name !== "charge") return;
+  setTimeout(() => { for (const id in chartReg) drawBars(id, chartReg[id].data, chartReg[id].opts); }, 60);
 }
 
 /* ---------- 유틸 ---------- */
 const fmtKm = v => (v/1000).toLocaleString("ko-KR",{maximumFractionDigits:1}) + " km";
 const fmtKwh = v => v.toLocaleString("ko-KR",{maximumFractionDigits:1}) + " kWh";
 const fmtWon = v => Math.round(v).toLocaleString("ko-KR") + "원";
+const DAYS = ["일","월","화","수","목","금","토"];
 const fmtDt = ts => { const d = new Date(ts);
-  return (d.getMonth()+1)+"."+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
-function monthRange(d) {
-  const a = new Date(d.getFullYear(), d.getMonth(), 1).getTime();
-  const b = new Date(d.getFullYear(), d.getMonth()+1, 1).getTime();
-  return [a, b];
+  return (d.getMonth()+1)+"."+d.getDate()+" ("+DAYS[d.getDay()]+") "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+const fmtDur = ms => { const m = Math.round(ms/60000); return m < 60 ? m + "분" : Math.floor(m/60) + "시간 " + (m%60) + "분"; };
+const agoText = ts => { const m = Math.round((Date.now()-ts)/60000);
+  return m < 1 ? "방금 전" : m < 60 ? m + "분 전" : m < 1440 ? Math.floor(m/60) + "시간 전" : Math.floor(m/1440) + "일 전"; };
+function dayStart(d) { const c = new Date(d); c.setHours(0,0,0,0); return c; }
+/* 기간 [시작, 끝) — 차량 앱 TripsScreen과 같은 규칙 (주는 월요일 시작) */
+function periodRange(period, cur) {
+  if (period === "all") return [0, Number.MAX_SAFE_INTEGER];
+  const c = dayStart(cur);
+  if (period === "week") { const wd = (c.getDay() + 6) % 7; c.setDate(c.getDate() - wd); }
+  if (period === "month") c.setDate(1);
+  if (period === "year") { c.setMonth(0, 1); }
+  const a = c.getTime();
+  if (period === "day") c.setDate(c.getDate() + 1);
+  if (period === "week") c.setDate(c.getDate() + 7);
+  if (period === "month") c.setMonth(c.getMonth() + 1);
+  if (period === "year") c.setFullYear(c.getFullYear() + 1);
+  return [a, c.getTime()];
+}
+function periodLabel(period, r, cur) {
+  const d = new Date(r[0]);
+  if (period === "day") return d.getFullYear() + "." + (d.getMonth()+1) + "." + d.getDate() + " (" + DAYS[d.getDay()] + ")";
+  if (period === "week") { const e = new Date(r[1]-1); return (d.getMonth()+1)+"."+d.getDate()+" ~ "+(e.getMonth()+1)+"."+e.getDate(); }
+  if (period === "month") return cur.getFullYear() + "년 " + (cur.getMonth()+1) + "월";
+  if (period === "year") return d.getFullYear() + "년";
+  return "전체 기간";
+}
+function periodMove(period, cur, dir) {
+  if (period === "day") cur.setDate(cur.getDate() + dir);
+  if (period === "week") cur.setDate(cur.getDate() + 7*dir);
+  if (period === "month") cur.setMonth(cur.getMonth() + dir);
+  if (period === "year") cur.setFullYear(cur.getFullYear() + dir);
+}
+function setPtabs(boxId, idx) {
+  const box = document.getElementById(boxId);
+  [...box.children].forEach((el, i) => el.classList.toggle("on", i === idx));
+}
+const tripEff = r => (r.energy_kwh && r.energy_kwh > 0.05) ? (r.distance_m/1000)/r.energy_kwh : null;
+const usualEff = () => {   // 최근 30일 평소 전비 (차량 앱 규칙)
+  const from = Date.now() - 30*86400000;
+  let km = 0, kwh = 0;
+  for (const r of allTrips) if (r.start_ts >= from && r.energy_kwh) { km += r.distance_m/1000; kwh += r.energy_kwh; }
+  return kwh > 0.5 && km > 0.5 ? km/kwh : null;
+};
+
+/* ---------- 데이터 (경로 빼고 한 번에, 상세는 열 때 경로만) ---------- */
+let allTrips = [], allCharges = [];
+const LITE = "client_id,start_ts,end_ts,distance_m,energy_kwh,soc_start,soc_end,avg_kmh,max_kmh";
+const EXTRA = ",regen_kwh,start_place,end_place";   // 서버 SQL v4(2026-09-13) 뒤에만 있는 열
+async function loadTrips() {
+  let res = await sb.from("trip").select(LITE + EXTRA).eq("device_id", DEV).order("start_ts", {ascending:false});
+  if (res.error) res = await sb.from("trip").select(LITE).eq("device_id", DEV).order("start_ts", {ascending:false});
+  allTrips = res.data || [];
+}
+async function loadCharges() {
+  const res = await sb.from("charge").select("*").eq("device_id", DEV).order("start_ts", {ascending:false});
+  allCharges = res.data || [];
 }
 
-/* ---------- 스탯 타일 ---------- */
-async function loadTiles() {
-  const [m0, m1] = monthRange(new Date());
-  const trips = await sb.from("trip").select("distance_m,energy_kwh,start_ts").eq("device_id", DEV);
-  const charges = await sb.from("charge").select("kwh,cost,start_ts").eq("device_id", DEV);
-  const t = trips.data || [], c = charges.data || [];
-  const totalM = t.reduce((s,r)=>s+(r.distance_m||0),0);
-  const totalE = t.reduce((s,r)=>s+(r.energy_kwh||0),0);
-  const mKm = t.filter(r=>r.start_ts>=m0&&r.start_ts<m1).reduce((s,r)=>s+(r.distance_m||0),0);
-  const mCost = c.filter(r=>r.start_ts>=m0&&r.start_ts<m1).reduce((s,r)=>s+(r.cost||0),0);
-  const tiles = [
-    ["누적 주행(기록)", fmtKm(totalM)],
-    ["이번 달 주행", fmtKm(mKm)],
-    ["이번 달 충전비", fmtWon(mCost)],
-    ["평균 전비", totalE>0.5 ? (totalM/1000/totalE).toFixed(1)+" km/kWh" : "-"]
+/* ---------- 주행 탭: 히어로 (차량 앱 주차 모드와 같은 구성) ---------- */
+function renderHero() {
+  const last = allTrips[0];
+  const lastC = allCharges[0];
+  const dot = document.getElementById("d-dot");
+  const st = document.getElementById("d-state");
+  const lastTs = Math.max(0, ...allTrips.map(r=>r.start_ts), ...allCharges.map(r=>r.start_ts));
+  if (lastTs > 0) document.getElementById("hd-updated").textContent = "마지막 기록 " + fmtDt(lastTs).replace(/ \(.\)/, "");
+  const today = dayStart(new Date()).getTime();
+  const [m0, m1] = periodRange("month", new Date());
+  const todayKm = allTrips.filter(r=>r.start_ts>=today).reduce((s,r)=>s+r.distance_m,0);
+  const monthKm = allTrips.filter(r=>r.start_ts>=m0&&r.start_ts<m1).reduce((s,r)=>s+r.distance_m,0);
+  const totalKm = allTrips.reduce((s,r)=>s+r.distance_m,0);
+  document.getElementById("d-hdrow").innerHTML =
+    `<span>오늘 주행<b>${fmtKm(todayKm)}</b></span><span>이번 달<b>${fmtKm(monthKm)}</b></span><span>기록 누적<b>${fmtKm(totalKm)}</b></span>`;
+
+  if (!last) {
+    setLbl("h1-lbl", "log", "마지막 주행"); setLbl("h2-lbl", "eff", "전비"); setLbl("h3-lbl", "compare", "평소 대비");
+    tween("h1", null); tween("h2", null); tween("h3", null);
+    st.textContent = "아직 주행 기록이 없습니다"; dot.className = "dot"; return;
+  }
+  const eff = tripEff(last), u = usualEff();
+  const delta = (eff != null && u) ? (eff/u - 1) * 100 : null;
+  setLbl("h1-lbl", "log", "마지막 주행 · " + agoText(last.end_ts));
+  tween("h1", last.distance_m/1000, v => big(v.toFixed(1), "km"));
+  const h3 = document.getElementById("h3");
+  if (eff != null) {
+    setLbl("h2-lbl", "eff", "전비"); setLbl("h3-lbl", "compare", "평소 대비");
+    tween("h2", eff, v => big(v.toFixed(1), "km/kWh"));
+    h3.className = "val " + (delta == null ? "" : delta >= 0 ? "green" : "warn");
+    tween("h3", delta, v => big((v >= 0 ? "+" : "−") + Math.abs(v).toFixed(0), "%"));
+  } else {
+    // 짧은 주행이라 배터리 델타가 없으면 전비 대신 시간·평균 속도
+    setLbl("h2-lbl", "time", "시간"); setLbl("h3-lbl", "speedAvg", "평균 속도");
+    shown["h2"] = null; document.getElementById("h2").innerHTML = fmtDur(last.end_ts - last.start_ts);
+    h3.className = "val";
+    tween("h3", last.avg_kmh, v => big(Math.round(v), "km/h"));
+  }
+  // 상태 줄: 충전이 주행보다 최근이면 충전 위주로
+  const chargingRecent = lastC && lastC.end_ts > last.end_ts && Date.now() - lastC.end_ts < 3600000;
+  if (chargingRecent) {
+    dot.className = "dot chg";
+    st.textContent = `충전 완료 · ${fmtKwh(lastC.kwh)} · ${fmtWon(lastC.cost)}` + (lastC.station ? ` · ${lastC.station}` : "");
+  } else {
+    dot.className = "dot" + (Date.now() - last.end_ts < 10*60000 ? " live" : "");
+    const word = delta == null ? "" : delta >= 3 ? ` · 평소보다 전비 ${delta.toFixed(0)}% 좋았어요` : delta <= -3 ? ` · 평소보다 전비 ${(-delta).toFixed(0)}% 낮았어요` : " · 평소와 비슷한 전비";
+    st.textContent = `주차 중 · 마지막 주행 ${fmtKm(last.distance_m)}` + word;
+  }
+}
+
+/* ---------- 주행 탭: 기간 요약 + 목록 ---------- */
+const T_PERIODS = ["day","week","month","year","all"];
+let tPeriod = "month", tCur = new Date(), tRows = [], tAll = false;
+document.getElementById("t-ptabs").addEventListener("click", e => {
+  const i = [...e.currentTarget.children].indexOf(e.target); if (i < 0) return;
+  tPeriod = T_PERIODS[i]; tAll = false; setPtabs("t-ptabs", i); tRender(true);
+});
+function tMove(d) { periodMove(tPeriod, tCur, d); tAll = false; tRender(true); }
+function tShowAll() { tAll = true; tRender(); }
+function tripRowHtml(r) {
+  const eff = tripEff(r);
+  const place = (r.start_place || r.end_place) ? `${r.start_place||"?"} → ${r.end_place||"?"}` : fmtDur(r.end_ts-r.start_ts) + (r.avg_kmh ? ` · 평균 ${Math.round(r.avg_kmh)} km/h` : "");
+  return `<div class="row" onclick="openTripDetail(${r.client_id})">
+    <div class="grow"><div class="t">${fmtDt(r.start_ts)}</div><div class="s">${place}</div></div>
+    <div class="r"><div class="big accent">${(r.distance_m/1000).toFixed(1)} km</div>
+      <div class="s">${eff ? eff.toFixed(1) + " km/kWh" : ""}${r.regen_kwh > 0.005 ? ` <span class="regen">· 회생 ${r.regen_kwh.toFixed(2)}</span>` : ""}</div></div>
+  </div>`;
+}
+function tRender(animate) {
+  const r = periodRange(tPeriod, tCur);
+  tRows = allTrips.filter(x => x.start_ts >= r[0] && x.start_ts < r[1]);
+  document.getElementById("t-period").textContent = periodLabel(tPeriod, r, tCur);
+  document.getElementById("t-prev").classList.toggle("hide", tPeriod === "all");
+  document.getElementById("t-next").classList.toggle("hide", tPeriod === "all");
+  let km = 0, ms = 0, kwh = 0, regen = 0, soc = 0;
+  for (const t of tRows) { km += t.distance_m/1000; ms += t.end_ts - t.start_ts; kwh += t.energy_kwh || 0; regen += t.regen_kwh || 0;
+    if (t.soc_start != null && t.soc_end != null) soc += t.soc_start - t.soc_end; }
+  const cells = [
+    ["log", "운행", "t-s-count", tRows.length, v => big(v.toFixed(0), "건")],
+    ["dist", "총 거리", "t-s-km", km, v => big(v.toFixed(1), "km")],
+    ["time", "총 시간", "t-s-time", tRows.length ? ms/60000 : null, v => fmtDur(v*60000)],
+    ["energy", "배터리 사용", "t-s-kwh", kwh > 0.005 ? kwh : null, v => big(v.toFixed(1), "kWh")],
+    ["eff", "전비", "t-s-eff", kwh > 0.05 ? km/kwh : null, v => big(v.toFixed(1), "km/kWh")]
   ];
-  document.getElementById("tiles").innerHTML =
-    tiles.map(x=>`<div class="tile"><div class="k">${x[0]}</div><div class="v">${x[1]}</div></div>`).join("");
-  const last = Math.max(0, ...t.map(r=>r.start_ts), ...c.map(r=>r.start_ts));
-  if (last>0) document.getElementById("hd-updated").textContent = "마지막 기록 " + fmtDt(last);
+  // 값이 없는 칸은 "-" 대신 아예 뺀다 (차량 앱과 같은 규칙): 배터리 %가 없는 주행, 회생이 서버에 아직 없는 경우
+  if (regen > 0.005) cells.splice(4, 0, ["regen", "회생 회수", "t-s-regen", regen, v => big(v.toFixed(2), "kWh")]);
+  if (soc > 0.5) cells.splice(4, 0, ["battery", "배터리 소모", "t-s-soc", soc, v => big(v.toFixed(0), "%")]);
+  const box = document.getElementById("t-sum");
+  box.innerHTML = cells.map(c => `<div class="cell"><div class="lbl">${ic(c[0])}<span>${c[1]}</span></div><div class="val${c[0]==="regen"?" green":c[0]==="eff"?" accent":""}" id="${c[2]}"></div></div>`).join("");
+  for (const c of cells) tween(c[2], c[3], c[4]);
+  const list = document.getElementById("t-list"), more = document.getElementById("t-more");
+  if (!tRows.length) {
+    list.innerHTML = `<div class="empty">${ic("log", 30)}<span>이 기간엔 주행 기록이 없습니다<br>주행이 끝나면 차량이 자동으로 올립니다</span></div>`;
+    more.style.display = "none";
+  } else {
+    const show = tAll ? tRows : tRows.slice(0, 8);
+    list.innerHTML = show.map(tripRowHtml).join("");
+    more.style.display = tRows.length > show.length ? "block" : "none";
+    more.textContent = `나머지 ${tRows.length - show.length}건 더 보기`;
+  }
+  if (animate) { for (const id of ["t-sum","t-list"]) { const el = document.getElementById(id); el.style.animation = "none"; void el.offsetWidth; el.style.animation = "rise .24s ease-out"; } }
 }
 
-/* ---------- 차트 (SVG 막대) ---------- */
+/* ---------- 충전 탭 ---------- */
+const C_PERIODS = ["week","month","year","all"];
+let cPeriod = "month", cCur = new Date(), cRows = [], cAll = false;
+document.getElementById("c-ptabs").addEventListener("click", e => {
+  const i = [...e.currentTarget.children].indexOf(e.target); if (i < 0) return;
+  cPeriod = C_PERIODS[i]; cAll = false; setPtabs("c-ptabs", i); cRender(true);
+});
+function cMove(d) { periodMove(cPeriod, cCur, d); cAll = false; cRender(true); }
+function cShowAll() { cAll = true; cRender(); }
+function chargeRowHtml(r) {
+  const parts = [r.type === "DC" ? "급속" : "완속"];
+  if (r.station) parts.push(r.station);
+  if (r.soc_start != null && r.soc_end != null) parts.push(`${Math.round(r.soc_start)} → ${Math.round(r.soc_end)}%`);
+  parts.push(fmtDur(r.end_ts - r.start_ts)); parts.push(`최대 ${r.max_kw} kW`);
+  return `<div class="row" onclick="openChargeDetail(${r.client_id})">
+    <span class="dotc ${r.type}"></span>
+    <div class="grow"><div class="t">${fmtDt(r.start_ts)}</div><div class="s">${parts.join(" · ")}</div></div>
+    <div class="r"><div class="big">${fmtKwh(r.kwh)}</div><div class="won">${fmtWon(r.cost)}</div></div>
+  </div>`;
+}
+function cRender(animate) {
+  const r = periodRange(cPeriod, cCur);
+  cRows = allCharges.filter(x => x.start_ts >= r[0] && x.start_ts < r[1]);
+  document.getElementById("c-period").textContent = periodLabel(cPeriod, r, cCur);
+  document.getElementById("c-prev").classList.toggle("hide", cPeriod === "all");
+  document.getElementById("c-next").classList.toggle("hide", cPeriod === "all");
+  const n = cRows.length, nDc = cRows.filter(x => x.type === "DC").length;
+  document.getElementById("c-count").textContent = n ? `${n}회 · 급속 ${nDc} · 완속 ${n-nDc}` : "";
+  const kwh = cRows.reduce((s,x)=>s+x.kwh,0), cost = cRows.reduce((s,x)=>s+x.cost,0);
+  const dcKwh = cRows.filter(x=>x.type==="DC").reduce((s,x)=>s+x.kwh,0);
+  tween("c-cost", n ? cost : null, v => fmtWon(v));
+  tween("c-kwh", n ? kwh : null, v => big(v.toFixed(1), "kWh"));
+  tween("c-unit", kwh > 0.01 ? cost/kwh : null, v => big(Math.round(v).toLocaleString("ko-KR"), "원"));
+  const dcW = kwh > 0.01 ? dcKwh/kwh : 0.5;
+  document.getElementById("c-split-dc").style.flex = Math.max(0.02, dcW);
+  document.getElementById("c-split-ac").style.flex = Math.max(0.02, 1-dcW);
+  document.getElementById("c-split-a").textContent = n ? `급속 ${fmtKwh(dcKwh)} · ${Math.round(dcW*100)}%` : "급속";
+  document.getElementById("c-split-b").textContent = n ? `완속 ${fmtKwh(kwh-dcKwh)} · ${Math.round((1-dcW)*100)}%` : "완속";
+  const list = document.getElementById("c-list"), more = document.getElementById("c-more");
+  if (!n) {
+    list.innerHTML = `<div class="empty">${ic("energy", 30)}<span>이 기간엔 충전 기록이 없습니다<br>충전이 끝나면 차량이 자동으로 올립니다</span></div>`;
+    more.style.display = "none";
+  } else {
+    const show = cAll ? cRows : cRows.slice(0, 8);
+    list.innerHTML = show.map(chargeRowHtml).join("");
+    more.style.display = cRows.length > show.length ? "block" : "none";
+    more.textContent = `나머지 ${cRows.length - show.length}건 더 보기`;
+  }
+  if (animate) { for (const id of ["c-list"]) { const el = document.getElementById(id); el.style.animation = "none"; void el.offsetWidth; el.style.animation = "rise .24s ease-out"; } }
+}
+
+/* ---------- 월별 막대 차트 (SVG) ---------- */
 const tipEl = () => document.getElementById("tooltip");
 function showTip(evt, text) {
   const el = tipEl();
   el.textContent = text; el.style.display = "block";
-  el.style.left = (evt.clientX + 14) + "px";
-  el.style.top = (evt.clientY - 10) + "px";
+  el.style.left = (evt.clientX + 14) + "px"; el.style.top = (evt.clientY - 10) + "px";
 }
 function hideTip() { tipEl().style.display = "none"; }
-
-/* 최근 6개월 키 배열 */
 function last6() {
   const out = [];
   const d = new Date(); d.setDate(1);
   for (let i = 5; i >= 0; i--) {
     const m = new Date(d.getFullYear(), d.getMonth()-i, 1);
-    out.push({ y:m.getFullYear(), m:m.getMonth(), label:(m.getMonth()+1)+"월",
-               a:m.getTime(), b:new Date(m.getFullYear(), m.getMonth()+1, 1).getTime() });
+    out.push({ label:(m.getMonth()+1)+"월", a:m.getTime(), b:new Date(m.getFullYear(), m.getMonth()+1, 1).getTime() });
   }
   return out;
 }
-
+const chartReg = {};
 function drawBars(svgId, data, opts) {
-  // data: [{label, segs:[{v, color, name}]}] — 세그먼트 1개면 단일 막대
   const svg = document.getElementById(svgId);
-  const W = svg.clientWidth || 460, H = svg.clientHeight || 180;
+  chartReg[svgId] = { data, opts };
+  let W = Math.round(svg.getBoundingClientRect().width);
+  if (!W || W < 100) W = Math.round(svg.parentElement.getBoundingClientRect().width);
+  if (!W || W < 100) return;   // 숨겨진 탭이면 나중에(탭 전환 때) 다시 그린다
+  let H = Math.round(svg.getBoundingClientRect().height);
+  if (!H || H < 80) H = 170;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  const padB = 22, padT = 14;
+  const padB = 26, padT = 22;
   const max = Math.max(1e-9, ...data.map(d=>d.segs.reduce((s,x)=>s+x.v,0)));
-  const bw = Math.min(44, (W-20)/data.length*0.55);
   const step = (W-20)/data.length;
+  const bw = Math.max(18, Math.min(48, step*0.5));
   let els = "";
   data.forEach((d,i)=>{
     const x = 10 + step*i + (step-bw)/2;
     let y = H-padB;
     const total = d.segs.reduce((s,x)=>s+x.v,0);
-    d.segs.forEach((s,si)=>{
+    const latest = i === data.length-1;
+    d.segs.forEach((s)=>{
       if (s.v<=0) return;
       const h = (H-padB-padT)*(s.v/max);
       y -= h;
-      // 세그먼트 사이 2px 표면 간격, 상단 세그먼트만 4px 라운드
-      const isTop = (y <= padT+1) || si === d.segs.length-1 ||
-                    d.segs.slice(si+1).every(z=>z.v<=0);
-      const r = isTop ? 4 : 0;
-      els += `<path d="M${x},${y+h} L${x},${y+r} Q${x},${y} ${x+r},${y} L${x+bw-r},${y}
-        Q${x+bw},${y} ${x+bw},${y+r} L${x+bw},${y+h} Z"
-        fill="${s.color}" stroke="var(--card)" stroke-width="2"
-        data-tip="${d.label} ${s.name}: ${opts.fmt(s.v)}"></path>`;
+      els += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5"
+        fill="${s.color}" opacity="${latest || d.segs.length>1 ? 1 : .45}" data-tip="${d.label} ${s.name}: ${opts.fmt(s.v)}"></rect>`;
     });
-    if (total>0 && (i===data.length-1 || total===max)) {
-      els += `<text x="${x+bw/2}" y="${y-6}" fill="var(--sub)" font-size="11"
-        text-anchor="middle">${opts.fmt(total)}</text>`;
+    if (total>0 && (latest || total===max)) {
+      els += `<text x="${x+bw/2}" y="${y-7}" fill="var(--text)" font-size="12" font-weight="500" text-anchor="middle">${opts.fmt(total)}</text>`;
     }
-    els += `<text x="${x+bw/2}" y="${H-6}" fill="var(--sub)" font-size="11"
-      text-anchor="middle">${d.label}</text>`;
+    els += `<text x="${x+bw/2}" y="${H-7}" fill="var(--muted)" font-size="12" text-anchor="middle">${d.label}</text>`;
   });
   els += `<line x1="10" y1="${H-padB}" x2="${W-10}" y2="${H-padB}" stroke="var(--line)"/>`;
   svg.innerHTML = els;
-  svg.querySelectorAll("path[data-tip]").forEach(p=>{
+  svg.querySelectorAll("rect[data-tip]").forEach(p=>{
     p.addEventListener("mousemove", e=>showTip(e, p.getAttribute("data-tip")));
     p.addEventListener("mouseleave", hideTip);
   });
 }
-
-async function loadCharts() {
+let chartResizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(chartResizeTimer);
+  chartResizeTimer = setTimeout(() => { for (const id in chartReg) drawBars(id, chartReg[id].data, chartReg[id].opts); }, 200);
+});
+function loadCharts() {
   const months = last6();
-  const from = months[0].a;
-  const trips = await sb.from("trip").select("start_ts,distance_m")
-    .eq("device_id", DEV).gte("start_ts", from);
-  const charges = await sb.from("charge").select("start_ts,cost,type")
-    .eq("device_id", DEV).gte("start_ts", from);
-  const t = trips.data || [], c = charges.data || [];
-
   drawBars("chart-km", months.map(m=>({
     label: m.label,
-    segs: [{ name:"주행",
-      v: t.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b).reduce((s,r)=>s+r.distance_m,0)/1000,
-      color:"var(--accent)" }]
+    segs: [{ name:"주행", color:"var(--accent)",
+      v: allTrips.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b).reduce((s,r)=>s+r.distance_m,0)/1000 }]
   })), { fmt:v=>v.toLocaleString("ko-KR",{maximumFractionDigits:0})+" km" });
-
   drawBars("chart-cost", months.map(m=>({
     label: m.label,
     segs: [
-      { name:"DC", color:"var(--dc)",
-        v: c.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b&&r.type==="DC").reduce((s,r)=>s+r.cost,0) },
-      { name:"AC", color:"var(--ac)",
-        v: c.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b&&r.type==="AC").reduce((s,r)=>s+r.cost,0) }
+      { name:"급속", color:"var(--dc)", v: allCharges.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b&&r.type==="DC").reduce((s,r)=>s+r.cost,0) },
+      { name:"완속", color:"var(--ac)", v: allCharges.filter(r=>r.start_ts>=m.a&&r.start_ts<m.b&&r.type==="AC").reduce((s,r)=>s+r.cost,0) }
     ]
   })), { fmt:v=>Math.round(v).toLocaleString("ko-KR")+"원" });
 }
 
-/* ---------- 월별 목록 ---------- */
-function moveMonth(d) { curMonth.setMonth(curMonth.getMonth()+d); loadMonth(); }
-async function loadMonth() {
-  const [a, b] = monthRange(curMonth);
-  document.getElementById("month-title").textContent =
-    curMonth.getFullYear()+"년 "+(curMonth.getMonth()+1)+"월";
-
-  const trips = await sb.from("trip").select("*").eq("device_id", DEV)
-    .gte("start_ts", a).lt("start_ts", b).order("start_ts",{ascending:false});
-  const t = trips.data || [];
-  const km = t.reduce((s,r)=>s+r.distance_m,0)/1000;
-  const en = t.reduce((s,r)=>s+(r.energy_kwh||0),0);
-  document.getElementById("trips-sum").textContent =
-    `주행 ${t.length}건 · ${km.toFixed(1)} km` + (en>0.3 ? ` · 전비 ${(km/en).toFixed(1)} km/kWh` : "");
-  document.getElementById("trips-list").innerHTML = t.length ? t.map(r=>`
-    <div class="row clickable" onclick='openTrip(${JSON.stringify(r.polyline||"[]")}, "${fmtDt(r.start_ts)}")'>
-      <div class="grow">
-        <div>${fmtDt(r.start_ts)} <span class="dim">${Math.round((r.end_ts-r.start_ts)/60000)}분</span></div>
-        <div class="dim">${r.energy_kwh&&r.energy_kwh>0.05?(r.distance_m/1000/r.energy_kwh).toFixed(1)+" km/kWh":""}
-          ${r.soc_start!=null&&r.soc_end!=null?` · ${Math.round(r.soc_start)}→${Math.round(r.soc_end)}%`:""}</div>
-      </div>
-      <div class="big" style="color:var(--accent)">${(r.distance_m/1000).toFixed(1)} km</div>
-    </div>`).join("") : '<div class="empty">이 달의 주행 기록 없음</div>';
-
-  const charges = await sb.from("charge").select("*").eq("device_id", DEV)
-    .gte("start_ts", a).lt("start_ts", b).order("start_ts",{ascending:false});
-  const c = charges.data || [];
-  document.getElementById("charges-sum").textContent =
-    `충전 ${c.length}건 · ${fmtKwh(c.reduce((s,r)=>s+r.kwh,0))} · ${fmtWon(c.reduce((s,r)=>s+r.cost,0))}`;
-  document.getElementById("charges-list").innerHTML = c.length ? c.map(r=>`
-    <div class="row">
-      <span class="badge ${r.type}">${r.type}</span>
-      <div class="grow">
-        <div>${fmtDt(r.start_ts)} <span class="dim">${Math.round((r.end_ts-r.start_ts)/60000)}분</span></div>
-        <div class="dim">${r.station?`${r.station} · `:""}${r.soc_start!=null&&r.soc_end!=null?`${Math.round(r.soc_start)}→${Math.round(r.soc_end)}% · `:""}최대 ${r.max_kw} kW</div>
-      </div>
-      <div style="text-align:right">
-        <div class="big">${fmtKwh(r.kwh)}</div>
-        <div class="dim" style="color:var(--accent)">${fmtWon(r.cost)}</div>
-      </div>
-    </div>`).join("") : '<div class="empty">이 달의 충전 기록 없음</div>';
-}
-
-/* ---------- 지도 타일 (VWorld 국토교통부 베이스맵) ---------- */
+/* ---------- 지도 타일 (VWorld 국토교통부 베이스맵, 다크) ---------- */
 const VWORLD_KEY = ""; /* vworld.kr 인증키 입력 */
 function vworldLayer() {
-  /* midnight = 다크 지도 (앱과 통일). 밝은 일반 지도를 원하면 midnight → Base */
-  return L.tileLayer(
-    "https://api.vworld.kr/req/wmts/1.0.0/" + VWORLD_KEY + "/midnight/{z}/{y}/{x}.png",
+  return L.tileLayer("https://api.vworld.kr/req/wmts/1.0.0/" + VWORLD_KEY + "/midnight/{z}/{y}/{x}.png",
     { minZoom: 6, maxZoom: 19, attribution: "&copy; VWorld" });
 }
+
+/* ---------- 폴스타 계정 (폰 앱에서만) ---------- */
+function psAvailable() { return typeof PolestarBridge !== "undefined"; }
+function psInit() {
+  if (!psAvailable()) return;
+  document.getElementById("ps-card").style.display = "block";
+  const saved = PolestarBridge.savedEmail();
+  if (saved) { document.getElementById("ps-email").value = saved; psFetch(); }
+  else {
+    document.getElementById("ps-data").textContent = "계정을 입력하면 적산거리·점검 정보를 가져옵니다";
+    document.getElementById("ps-login").style.display = "block";
+  }
+}
+function psLogin() {
+  const email = document.getElementById("ps-email").value.trim();
+  const pw = document.getElementById("ps-pw").value;
+  if (!email || !pw) { document.getElementById("ps-data").textContent = "이메일과 비밀번호를 입력하세요"; return; }
+  document.getElementById("ps-data").textContent = "로그인 중…";
+  PolestarBridge.fetch(email, pw);
+}
+function psFetch() { document.getElementById("ps-data").textContent = "불러오는 중…"; PolestarBridge.fetch("", ""); }
+window.onPolestarResult = function (data, err) {
+  const box = document.getElementById("ps-data");
+  const login = document.getElementById("ps-login");
+  const refresh = document.getElementById("ps-refresh");
+  if (!data) { box.textContent = "실패: " + (err || "알 수 없음"); login.style.display = "block"; refresh.style.display = "none"; return; }
+  login.style.display = "none"; refresh.style.display = "block";
+  const km = v => Math.round(v).toLocaleString("ko-KR") + " km";
+  const rows = [];
+  if (data.batteryPct != null) rows.push(["battery", "배터리", Math.round(data.batteryPct) + "%"]);
+  if (data.rangeKm != null) rows.push(["range", "주행가능", km(data.rangeKm)]);
+  if (data.odometerKm != null) rows.push(["dist", "적산거리", km(data.odometerKm)]);
+  if (data.chargingStatus) {
+    const st = String(data.chargingStatus).replace(/^CHARGING_STATUS_/, "");
+    const label = /^(DONE|COMPLETE|IDLE_?FULL|CHARGING_COMPLETE)/.test(st) ? "충전 완료"
+      : /^(FAULT|ERROR)/.test(st) ? "충전 오류" : /^(DISCONNECT|IDLE|UNPLUG)/.test(st) ? "미연결"
+      : /^(CHARGING|SMART|SCHEDULED)/.test(st) ? "충전 중" : st;
+    rows.push(["energy", "충전", label]);
+  }
+  if (data.chargeToFullMin != null && data.chargeToFullMin > 0) {
+    const m = data.chargeToFullMin;
+    rows.push(["time", "완료까지", m >= 60 ? Math.floor(m/60) + "시간 " + (m%60) + "분" : m + "분"]);
+  }
+  if (data.distanceToServiceKm != null) rows.push(["log", "점검까지", km(data.distanceToServiceKm)]);
+  if (data.daysToService != null) rows.push(["time", "점검 D-", data.daysToService + "일"]);
+  const ok = v => !v || /NO_WARNING|NORMAL|OK/i.test(String(v));
+  const warns = [];
+  if (!ok(data.serviceWarning)) warns.push("정비 " + data.serviceWarning);
+  if (!ok(data.brakeFluidWarning)) warns.push("브레이크액 " + data.brakeFluidWarning);
+  if (!ok(data.oilWarning)) warns.push("오일 " + data.oilWarning);
+  if (!ok(data.coolantWarning)) warns.push("냉각수 " + data.coolantWarning);
+  const title = [data.modelName, data.registrationNo].filter(Boolean).join(" · ");
+  box.innerHTML =
+    (data.imageUrl ? '<img src="' + data.imageUrl + '" alt="" style="width:100%;max-height:160px;object-fit:contain;margin-bottom:6px">' : "") +
+    (title ? '<div style="color:var(--text);font-size:16px;font-weight:500;margin-bottom:4px">' + title + "</div>" : "") +
+    (rows.length
+      ? '<div class="dgrid" style="margin:10px 0 0">' +
+        rows.map(r => '<div><div class="lbl">' + ic(r[0]) + '<span>' + r[1] + '</span></div><div class="val" style="font-size:22px">' + r[2] + '</div></div>').join("") + "</div>"
+      : "받은 값이 없습니다") +
+    (warns.length ? '<div style="margin-top:10px;color:#FF5C5C;font-size:14px">⚠ ' + warns.join(" · ") + "</div>" : "");
+};
 
 /* ---------- 주차 위치 ---------- */
 let parkMap = null;
 async function loadParking() {
   const res = await sb.from("parking").select("*").eq("device_id", DEV).maybeSingle();
   const p = res.data;
-  if (!p) { document.getElementById("park-info").textContent = "주차 기록 없음"; return; }
-  parkMap = L.map("map").setView([p.lat, p.lon], 16);
+  const title = document.getElementById("park-title"), info = document.getElementById("park-info");
+  if (!p) { title.textContent = "아직 기록 없음"; info.textContent = "첫 주행이 끝나면 주차한 자리가 자동으로 올라옵니다"; document.getElementById("map").style.display = "none"; return; }
+  title.textContent = agoText(p.ts) + " 주차" + (p.soc != null ? ` · 배터리 ${Math.round(p.soc)}%` : "");
+  info.textContent = fmtDt(p.ts) + `  ·  ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+  parkMap = L.map("map", { zoomControl:false }).setView([p.lat, p.lon], 16);
   vworldLayer().addTo(parkMap);
-  L.marker([p.lat, p.lon]).addTo(parkMap);
-  document.getElementById("park-info").textContent =
-    fmtDt(p.ts) + " 주차" + (p.soc!=null ? ` · 배터리 ${Math.round(p.soc)}%` : "") +
-    ` · ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+  L.circleMarker([p.lat, p.lon], {radius:9, color:"#FF7500", fillColor:"#FF7500", fillOpacity:1, weight:3}).addTo(parkMap);
+  const img = document.getElementById("park-photo");
+  const note = document.getElementById("park-photo-note");
+  if (p.photo_ts) {
+    note.textContent = "주차 사진 불러오는 중…";
+    img.onload = () => { img.style.display = "block"; note.textContent = ""; };
+    img.onerror = () => { img.style.display = "none"; note.textContent = "주차 사진을 불러오지 못했습니다 (업로드가 끝나지 않았을 수 있습니다)"; };
+    img.src = `${BASEURL}/storage/v1/object/public/parking/${DEV}.jpg?t=${p.photo_ts}`;
+  } else {
+    img.style.display = "none";
+    // 촬영 결과는 주행 저장 직후 동기화보다 늦게 끝나므로(2026-09-13 확인) 차량이 다음에 켜질 때 올라오는 경우가 흔하다
+    note.textContent = "주차 사진이 아직 안 올라왔습니다 — 차량이 다음에 켜져 동기화되면 표시됩니다";
+  }
 }
 
-/* ---------- 소모품 ---------- */
+/* ---------- 소모품 (차량 탭과 같은 색 단계: 여유 흰색 → 곧 교체 주황 → 교체 필요 빨강) ---------- */
 async function loadConsumables() {
   const res = await sb.from("consumable").select("*").eq("device_id", DEV).order("name");
   const list = res.data || [];
   document.getElementById("cons-list").innerHTML = list.length ? list.map(r=>{
-    let state = "";
-    if (r.remain_km != null) state = Math.round(r.remain_km).toLocaleString("ko-KR")+" km 남음";
-    if (r.remain_months != null)
-      state += (state?" · ":"") + r.remain_months.toFixed(1)+"개월 남음";
-    const danger = (r.remain_km!=null && r.remain_km<=0) || (r.remain_months!=null && r.remain_months<=0);
-    return `<div class="row"><div class="grow">${r.name}</div>
-      <div class="dim" style="${danger?'color:#FF7B7B':''}">${state||"-"}</div></div>`;
-  }).join("") : '<div class="empty">아직 업로드된 소모품 정보 없음</div>';
+    let ratio = 0, remain = "-";
+    const parts = [];
+    if (r.cycle_km > 0) { ratio = Math.max(ratio, (r.used_km||0)/r.cycle_km); remain = Math.round(r.remain_km).toLocaleString("ko-KR") + " km";
+      parts.push(`사용 ${Math.round(r.used_km||0).toLocaleString("ko-KR")} / ${r.cycle_km.toLocaleString("ko-KR")} km`); }
+    if (r.cycle_months > 0 && r.remain_months != null) { ratio = Math.max(ratio, (r.cycle_months - r.remain_months)/r.cycle_months);
+      if (!(r.cycle_km > 0)) remain = r.remain_months.toFixed(1) + "개월"; parts.push(`${r.remain_months.toFixed(1)}개월 남음 (주기 ${r.cycle_months}개월)`); }
+    const st = ratio >= 1 ? ["교체 필요", "#FF5C5C"] : ratio >= 0.85 ? ["곧 교체", "#FF7500"] : [`${Math.round(ratio*100)}% 사용`, "#8E8E93"];
+    const bar = ratio >= 0.85 ? st[1] : "#F2F2F2";
+    return `<div class="cons"><div class="h"><span class="n">${r.name}</span><span class="st" style="color:${st[1]}">${st[0]}</span><span class="rm">${remain}</span></div>
+      <div class="d">${parts.join(" · ")}</div><div class="bar"><i style="width:${Math.min(100, Math.max(0, ratio*100))}%;background:${bar}"></i></div></div>`;
+  }).join("") : `<div class="empty">${ic("log", 30)}<span>아직 올라온 소모품 정보가 없습니다</span></div>`;
 }
 
-/* ---------- 주행 경로 모달 ---------- */
+/* ---------- 주행 상세 시트 ---------- */
 let tripMap = null;
-function openTrip(polyJson, title) {
-  const pts = typeof polyJson === "string" ? JSON.parse(polyJson) : polyJson;
-  if (!pts || !pts.length) return;
-  document.getElementById("modal").style.display = "flex";
-  document.getElementById("modal-title").textContent = title + " 주행 경로";
+function distM(a, b) {
+  const R = 6371000, toRad = Math.PI / 180;
+  const dLat = (b[0]-a[0])*toRad, dLon = (b[1]-a[1])*toRad;
+  const s = Math.sin(dLat/2)**2 + Math.cos(a[0]*toRad)*Math.cos(b[0]*toRad)*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+function effColor(eff) {
+  if (eff === null) return "#FF7500";
+  if (eff < 0) return "#4DA3FF";
+  if (eff >= 6) return "#3ECF6E";
+  if (eff >= 4) return "#FFB020";
+  return "#FF5C5C";
+}
+/* 경로 그리기 (Wh 있으면 구간별 전비 색상). 범례 표시 여부 반환 */
+function drawTripRoute(mapObj, pts) {
+  const latlngs = pts.map(p=>[p[0],p[1]]);
+  const hasWh = pts.filter(p=>p.length>=3&&p[2]!=null).length >= pts.length*0.8 && pts.length>=4;
+  if (!hasWh) {
+    L.polyline(latlngs, { color:"#FF7500", weight:5, opacity:.9 }).addTo(mapObj);
+  } else {
+    let start = 0, dist = 0, lastColor = "#FF7500";
+    for (let i = 1; i < pts.length; i++) {
+      dist += distM(pts[i-1], pts[i]);
+      const whA = pts[start][2], whB = pts[i][2];
+      const changed = whA != null && whB != null && whB !== whA;
+      const isLast = i === pts.length-1;
+      if ((changed && dist >= 150) || isLast) {
+        let color;
+        if (!changed) color = lastColor;
+        else { const used = whA - whB; const eff = used < 0 ? -1 : (dist/1000)/(used/1000); color = effColor(eff); }
+        L.polyline(latlngs.slice(start, i+1), { color, weight:5, opacity:.95 }).addTo(mapObj);
+        lastColor = color; start = i; dist = 0;
+      }
+    }
+  }
+  L.circleMarker(latlngs[0], {radius:7,color:"#3ECF6E",fillColor:"#3ECF6E",fillOpacity:1}).addTo(mapObj);
+  L.circleMarker(latlngs[latlngs.length-1], {radius:7,color:"#FF5C5C",fillColor:"#FF5C5C",fillOpacity:1}).addTo(mapObj);
+  mapObj.fitBounds(L.latLngBounds(latlngs), { padding:[24,24] });
+  return hasWh;
+}
+/* 전비 비교 막대 (최근 주행 회색, 이번 주행 주황, 평균 점선) */
+function drawEffChart(svgId, items, highlightId) {
+  const svg = document.getElementById(svgId);
+  let W = Math.round(svg.getBoundingClientRect().width);
+  if (!W || W < 100) W = Math.round(svg.parentElement.getBoundingClientRect().width) || 400;
+  let H = Math.round(svg.getBoundingClientRect().height);
+  if (!H || H < 80) H = 220;
+  const padT = 30, padB = 10, padR = 80;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  if (!items || items.length < 2) {
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="var(--muted)" font-size="14" text-anchor="middle">전비 기록이 2건 이상 쌓이면 비교 그래프가 표시됩니다</text>`;
+    return;
+  }
+  const maxEff = Math.max(...items.map(x=>x.eff)) * 1.2;
+  const avg = items.reduce((s,x)=>s+x.eff,0) / items.length;
+  const chartW = W - padR, chartH = H - padT - padB;
+  const step = chartW / items.length, bw = Math.max(10, step*0.55);
+  let els = "";
+  items.forEach((it,i)=>{
+    const h = (it.eff/maxEff)*chartH;
+    const x = i*step + (step-bw)/2, y = padT + chartH - h;
+    const hl = it.id === highlightId;
+    els += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${hl?"#FF7500":"#3A3B40"}"></rect>`;
+    if (hl) els += `<text x="${x+bw/2}" y="${y-7}" fill="#FF7500" font-size="14" font-weight="600" text-anchor="middle">${it.eff.toFixed(1)}</text>`;
+  });
+  const avgY = padT + chartH - (avg/maxEff)*chartH;
+  els += `<line x1="0" y1="${avgY}" x2="${chartW}" y2="${avgY}" stroke="var(--sub)" stroke-dasharray="6 5" stroke-width="1.5"/>`;
+  els += `<text x="${chartW+8}" y="${avgY+5}" fill="var(--sub)" font-size="13">평균 ${avg.toFixed(1)}</text>`;
+  svg.innerHTML = els;
+}
+const cell = (icon, k, v, cls) => `<div><div class="lbl">${ic(icon)}<span>${k}</span></div><div class="val${cls?" "+cls:""}">${v}</div></div>`;
+async function openTripDetail(clientId) {
+  const r = allTrips.find(x => x.client_id === clientId);
+  if (!r) return;
+  document.getElementById("modal").classList.add("on");
+  document.getElementById("modal-title").textContent = fmtDt(r.start_ts) + " 주행";
+  shown["td-hero"] = 0;
+  tween("td-hero", r.distance_m/1000, v => big(v.toFixed(1), "km"));
+  document.getElementById("td-place").textContent = (r.start_place || r.end_place) ? `${r.start_place||"?"}  →  ${r.end_place||"?"}` : "";
+  const eff = tripEff(r);
+  const cells = [
+    cell("time", "시간", fmtDur(r.end_ts-r.start_ts)),
+    cell("eff", "전비", eff ? big(eff.toFixed(1), "km/kWh") : "-", "accent"),
+    cell("energy", "배터리 사용", r.energy_kwh ? big(r.energy_kwh.toFixed(1), "kWh") : "-"),
+  ];
+  if (r.soc_start != null && r.soc_end != null) cells.push(cell("battery", "배터리", `${Math.round(r.soc_start)} → ${Math.round(r.soc_end)}%`));
+  if (r.regen_kwh > 0.005) cells.push(cell("regen", "회생 회수", big(r.regen_kwh.toFixed(2), "kWh"), "green"));
+  cells.push(cell("speedAvg", "평균 속도", r.avg_kmh != null ? big(Math.round(r.avg_kmh), "km/h") : "-"));
+  cells.push(cell("speedMax", "최고 속도", r.max_kmh != null ? big(Math.round(r.max_kmh), "km/h") : "-"));
+  document.getElementById("modal-grid").innerHTML = cells.join("");
+  // 경로는 열 때만 (목록 조회는 가볍게)
+  const pres = await sb.from("trip").select("polyline").eq("device_id", DEV).eq("client_id", clientId).maybeSingle();
+  let pts = [];
+  try { const pl = pres.data && pres.data.polyline; pts = typeof pl === "string" ? JSON.parse(pl||"[]") : (pl||[]); } catch(e) { pts = []; }
   setTimeout(()=>{
     if (tripMap) { tripMap.remove(); tripMap = null; }
-    tripMap = L.map("tripmap");
+    tripMap = L.map("tripmap", { zoomControl:false });
     vworldLayer().addTo(tripMap);
-    const line = L.polyline(pts, { color:"#E86A00", weight:5, opacity:.9 }).addTo(tripMap);
-    L.circleMarker(pts[0], {radius:7,color:"#3ECF6E",fillColor:"#3ECF6E",fillOpacity:1}).addTo(tripMap);
-    L.circleMarker(pts[pts.length-1], {radius:7,color:"#FF5C5C",fillColor:"#FF5C5C",fillOpacity:1}).addTo(tripMap);
-    tripMap.fitBounds(line.getBounds(), { padding:[24,24] });
+    let hasWh = false;
+    if (pts.length) hasWh = drawTripRoute(tripMap, pts); else tripMap.setView([36.5, 127.8], 7);
+    document.getElementById("route-legend").style.display = hasWh ? "block" : "none";
+    const effs = allTrips.filter(x=>x.energy_kwh>0.05).slice(0, 15).map(x=>({ id:x.client_id, eff:(x.distance_m/1000)/x.energy_kwh })).reverse();
+    drawEffChart("trip-eff", effs, r.client_id);
   }, 60);
 }
-function closeModal(){ document.getElementById("modal").style.display = "none"; }
+function closeModal(){ document.getElementById("modal").classList.remove("on"); }
+
+/* ---------- 충전 상세 시트 ---------- */
+function closeCModal(){ document.getElementById("cmodal").classList.remove("on"); }
+function niceStep(range, target) {
+  const raw = range / target;
+  if (!(raw > 0)) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+}
+function smoothPts(src, win) {
+  const half = win >> 1;
+  return src.map((p, i) => {
+    let sum = 0, cnt = 0;
+    for (let j = Math.max(0, i - half); j <= Math.min(src.length - 1, i + half); j++) { sum += src[j][1]; cnt++; }
+    return [p[0], sum / cnt];
+  });
+}
+/* 충전 속도 곡선. y축은 데이터에 맞춰 자동 확대 (완속처럼 변동이 작을 때 0부터 그리면 일자로 보인다) */
+function drawProfileChart(svgId, pts, dc) {
+  const svg = document.getElementById(svgId);
+  let W = Math.round(svg.getBoundingClientRect().width);
+  if (!W || W < 100) W = Math.round(svg.parentElement.getBoundingClientRect().width) || 400;
+  let H = Math.round(svg.getBoundingClientRect().height);
+  if (!H || H < 80) H = 220;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  if (!pts || pts.length < 2) {
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="var(--muted)" font-size="14" text-anchor="middle">충전 속도 데이터가 없습니다</text>`;
+    return;
+  }
+  const color = dc ? "#FF7500" : "#4DA3FF", fillc = dc ? "rgba(255,117,0,.14)" : "rgba(77,163,255,.14)";
+  const padT = 20, padB = 26, padL = 8, padR = 14;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const dataMax = Math.max(...pts.map(p=>p[1])), dataMin = Math.min(...pts.map(p=>p[1]));
+  const maxMin = Math.max(...pts.map(p=>p[0]), 1);
+  const zoom = dataMin > 0 && (dataMax - dataMin) < dataMax * 0.35;
+  const span = Math.max(zoom ? dataMax - dataMin : dataMax, 0.1);
+  const step = niceStep(span * 1.15, 4);
+  const yMin = zoom ? Math.floor(dataMin/step)*step : 0;
+  let yMax = Math.ceil(dataMax/step)*step;
+  if (yMax <= yMin) yMax = yMin + step;
+  const px = m => padL + (m/maxMin)*chartW;
+  const py = k => padT + chartH - ((k-yMin)/(yMax-yMin))*chartH;
+  const fmtKw = v => v < 0.05 ? "0" : v < 10 ? v.toFixed(1) : v.toFixed(0);
+  const toPath = src => src.map((p,i)=>`${i===0?"M":"L"}${px(p[0]).toFixed(1)},${py(p[1]).toFixed(1)}`).join(" ");
+  const ticks = Math.round((yMax-yMin)/step);
+  let grid = "";
+  for (let i = 0; i <= ticks; i++) {
+    const v = yMin + step*i, gy = py(v).toFixed(1);
+    grid += `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="#2A2B30" stroke-dasharray="6 6" stroke-width="1"></line>
+      <text x="${padL}" y="${gy-4}" fill="var(--muted)" font-size="12">${fmtKw(v)}${i===ticks?" kW":""}</text>`;
+  }
+  const win = Math.max(1, Math.round(pts.length/40));
+  const trend = win > 1 ? smoothPts(pts, win) : pts;
+  const raw = win > 1 ? `<path d="${toPath(pts)}" fill="none" stroke="${color}" opacity=".35" stroke-width="1.5"></path>` : "";
+  const base = (padT+chartH).toFixed(1);
+  const area = zoom ? "" : `<path d="M${px(trend[0][0]).toFixed(1)},${base} ${toPath(trend).replace(/^M/, "L")} L${px(trend[trend.length-1][0]).toFixed(1)},${base} Z" fill="${fillc}"></path>`;
+  const peak = pts.reduce((a,b)=>b[1]>a[1]?b:a, pts[0]);
+  svg.innerHTML = `${grid}${area}${raw}
+    <path d="${toPath(trend)}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+    <circle cx="${px(peak[0]).toFixed(1)}" cy="${py(peak[1]).toFixed(1)}" r="4" fill="${color}"></circle>
+    <text x="${padL}" y="${H-7}" fill="var(--muted)" font-size="12">0분</text>
+    <text x="${padL+chartW/2}" y="${H-7}" fill="var(--muted)" font-size="12" text-anchor="middle">${Math.round(maxMin/2)}분</text>
+    <text x="${W-padR}" y="${H-7}" fill="var(--muted)" font-size="12" text-anchor="end">${Math.round(maxMin)}분</text>`;
+}
+function openChargeDetail(clientId) {
+  const r = allCharges.find(x => x.client_id === clientId);
+  if (!r) return;
+  document.getElementById("cmodal").classList.add("on");
+  document.getElementById("cmodal-title").textContent = fmtDt(r.start_ts) + " 충전";
+  const t = document.getElementById("cmodal-type");
+  t.textContent = "● " + (r.type === "DC" ? "급속" : "완속"); t.className = "typetxt " + r.type;
+  shown["cd-hero"] = 0; shown["cd-cost"] = 0;
+  tween("cd-hero", r.kwh, v => big(v.toFixed(1), "kWh"));
+  tween("cd-cost", r.cost, v => fmtWon(v));
+  const cells = [
+    cell("time", "시간", fmtDur(r.end_ts - r.start_ts)),
+    cell("battery", "배터리", r.soc_start!=null&&r.soc_end!=null ? `${Math.round(r.soc_start)} → ${Math.round(r.soc_end)}%` : "-"),
+    cell("won", "단가", r.kwh>0.01 ? big((r.cost/r.kwh).toFixed(1), "원/kWh") : "-"),
+    cell("speed", "최대 전력", big(r.max_kw, "kW")),
+    cell("station", "충전소", r.station || "미확인", "sm")
+  ];
+  document.getElementById("cmodal-grid").innerHTML = cells.join("");
+  let pts = [];
+  try { pts = typeof r.profile === "string" ? JSON.parse(r.profile||"[]") : (r.profile||[]); } catch(e) { pts = []; }
+  setTimeout(()=>drawProfileChart("charge-profile", pts, r.type === "DC"), 60);
+}
 
 /* ---------- 시작 ---------- */
 /* 기본값 내장 (2026-08-07 사용자 결정, 개인용 전제) — 이 파일을 공개 장소에 올리지 말 것.
    주소 뒤에 #setup 을 붙여 열면 설정 화면이 나옴 (차량 ID 변경용) */
 const DEFAULT_CFG = {
-  u: "",
-  k: "",
-  d: ""
+  u: "",   // Supabase Project URL (비워 두면 첫 화면에서 입력)
+  k: "",   // anon public 키
+  d: ""     // 차량 ID (차량 앱 설정 화면의 값)
 };
 window.addEventListener("load", ()=>{
   const forceSetup = location.hash === "#setup";

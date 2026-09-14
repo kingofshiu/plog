@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- P.Log 자체 아이콘 (선 스타일, 2026-09-08) — 사용 전력: 번개 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp" android:height="30dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" android:pathData="M13.2,2.5 L5,13.2 L11,13.2 L10.2,21.5 L19,10.6 L13,10.6 Z" />
+</vector>

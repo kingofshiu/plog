@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- P.Log 자체 아이콘 (선 스타일, 2026-09-08) — 전비: 잎사귀 (v2: 잎맥을 곡선으로, 잎 끝을 위로 — 이전 모양은 금지 표시처럼 보였음) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp" android:height="30dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" android:pathData="M5,20 C5,12 9.5,5.5 19.5,4 C19,13.5 14,19.5 6,20 Z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" android:pathData="M5,20 C8,15 11,11 16,7.5" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" android:pathData="M10.5,12.8 L13.8,13.2 M8.2,16 L11.6,16.6" />
+</vector>

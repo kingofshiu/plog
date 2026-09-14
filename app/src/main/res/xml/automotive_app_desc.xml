@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 차량 미디어 앱이 이 앱을 미디어 소스로 인식하게 하는 선언 (2026-09-05 주행 중 표시 실험) -->
+<automotiveApp>
+    <uses name="media" />
+</automotiveApp>

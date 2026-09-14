@@ -18,17 +18,31 @@
             android:layout_height="48dp"
             android:gravity="center"
             android:text="←"
-            android:textSize="24sp"
+            android:textSize="@dimen/text_body"
             android:textColor="@color/text" />
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="차량 데이터 진단"
-            android:textSize="18sp"
+            android:textSize="@dimen/text_small"
             android:fontFamily="sans-serif-medium"
             android:textColor="@color/text" />
         <Button
+                android:fontFamily="sans-serif-medium"
+                android:textSize="@dimen/text_label"
+            android:id="@+id/diag_battery"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_button_dim"
+            android:textColor="@color/text"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="절전 예외"
+            android:layout_marginEnd="8dp" />
+        <Button
+                android:fontFamily="sans-serif-medium"
+                android:textSize="@dimen/text_label"
             android:id="@+id/diag_req_perm"
             android:layout_width="wrap_content"
             android:layout_height="44dp"
@@ -39,6 +53,8 @@
             android:text="권한 다시 요청"
             android:layout_marginEnd="8dp" />
         <Button
+                android:fontFamily="sans-serif-medium"
+                android:textSize="@dimen/text_label"
             android:id="@+id/diag_refresh"
             android:layout_width="wrap_content"
             android:layout_height="44dp"
@@ -47,6 +63,71 @@
             android:paddingStart="14dp"
             android:paddingEnd="14dp"
             android:text="새로고침" />
+    </LinearLayout>
+
+    <!-- 주차 사진 관련 버튼 (2026-09-03 별도 줄로 분리) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="4dp">
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="주차 사진"
+            android:textSize="@dimen/text_small"
+            android:textColor="@color/text_sub" />
+        <Button
+                android:fontFamily="sans-serif-medium"
+                android:textSize="@dimen/text_label"
+            android:id="@+id/diag_test_photo"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_button_dim"
+            android:textColor="@color/text"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="사진 시험 촬영"
+            android:layout_marginEnd="8dp" />
+        <Button
+                android:fontFamily="sans-serif-medium"
+                android:textSize="@dimen/text_label"
+            android:id="@+id/diag_cdm"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_button_dim"
+            android:textColor="@color/text"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="동반 기기 연결"
+            android:layout_marginEnd="8dp" />
+        <Button
+                android:fontFamily="sans-serif-medium"
+                android:textSize="@dimen/text_label"
+            android:id="@+id/diag_overlay"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_button_dim"
+            android:textColor="@color/text"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="주행 오버레이"
+            android:layout_marginEnd="8dp" />
+        <Button
+                android:fontFamily="sans-serif-medium"
+                android:textSize="@dimen/text_label"
+            android:id="@+id/diag_test_flow"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_button_dim"
+            android:textColor="@color/text"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:text="백그라운드 촬영 시험" />
     </LinearLayout>
 
     <ScrollView
@@ -60,7 +141,7 @@
             android:layout_height="wrap_content"
             android:background="@drawable/bg_card"
             android:padding="16dp"
-            android:textSize="15sp"
+            android:textSize="@dimen/text_small"
             android:lineSpacingExtra="4dp"
             android:textColor="@color/text"
             android:fontFamily="monospace" />

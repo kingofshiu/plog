@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 주행 탭 주행 기록 한 줄 (v12, 2026-09-06: 글자 조금 키움. "누르면 상세" 안내·› 표시는 사용자 요청으로 뺌):
+     시각 · 거리 · 전비 숫자 · 전비 인라인 막대(표 안 최대 대비) · 회생 . 누르면 host.openTrip(id) → 주행 상세(지도+차트) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingTop="16dp"
+    android:paddingBottom="16dp">
+    <TextView
+        android:id="@+id/rtc_when"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1.15"
+        android:textSize="@dimen/text_body"
+        android:textColor="@color/text_sub"
+        android:singleLine="true" />
+    <TextView
+        android:id="@+id/rtc_km"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.8"
+        android:textSize="@dimen/text_body"
+        android:fontFamily="sans-serif-medium"
+        android:textColor="@color/text"
+        android:singleLine="true" />
+    <TextView
+        android:id="@+id/rtc_eff"
+        android:layout_width="68dp"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:textSize="@dimen/text_title"
+        android:fontFamily="sans-serif-light"
+        android:textColor="@color/text"
+        android:includeFontPadding="false"
+        android:singleLine="true" />
+    <ProgressBar
+        android:id="@+id/rtc_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="0dp"
+        android:layout_height="5dp"
+        android:layout_weight="0.7"
+        android:layout_marginStart="10dp"
+        android:layout_marginEnd="10dp"
+        android:max="100"
+        android:progressDrawable="@drawable/pb_eff" />
+    <TextView
+        android:id="@+id/rtc_regen"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.62"
+        android:gravity="end"
+        android:textSize="@dimen/text_body"
+        android:textColor="@color/green"
+        android:singleLine="true" />
+</LinearLayout>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- P.Log 자체 아이콘 (선 스타일, 2026-09-08) — 주행가능거리: 도로와 도착 깃발 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp" android:height="30dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:strokeLineJoin="round" android:fillColor="#00000000" android:pathData="M4,20 L9,4 M20,20 L15,4 M12,6.5 V9 M12,12 V14.5 M12,17.5 V20" />
+</vector>

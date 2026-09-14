@@ -29,6 +29,7 @@ class TripEffChartView @JvmOverloads constructor(
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#C9C9CE")
+        isFakeBoldText = true
     }
     private val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#FF7500")
@@ -54,7 +55,7 @@ class TripEffChartView @JvmOverloads constructor(
         val dp = resources.displayMetrics.density
 
         if (items.size < 2) {
-            hintPaint.textSize = 16f * dp
+            hintPaint.textSize = 19f * dp
             canvas.drawText(
                 "전비 기록이 2건 이상 쌓이면 비교 그래프가 표시됩니다",
                 w / 2f, h / 2f + hintPaint.textSize / 3f, hintPaint
@@ -64,7 +65,7 @@ class TripEffChartView @JvmOverloads constructor(
 
         val topPad = 18f * dp
         val bottomPad = 6f * dp
-        val rightPad = 64f * dp   // 평균 라벨 자리
+        val rightPad = 84f * dp   // 평균 라벨 자리
         val chartW = w - rightPad
         val chartH = h - topPad - bottomPad
         val maxEff = (items.maxOf { it.second } * 1.2).coerceAtLeast(1.0)
@@ -84,7 +85,7 @@ class TripEffChartView @JvmOverloads constructor(
             val r = 2f * dp
             canvas.drawRoundRect(rect, r, r, barPaint)
             if (id == highlightId) {
-                valuePaint.textSize = 15f * dp
+                valuePaint.textSize = 19f * dp
                 canvas.drawText(
                     String.format("%.1f", eff),
                     left + barW / 2f, rect.top - 6f * dp, valuePaint
@@ -95,7 +96,7 @@ class TripEffChartView @JvmOverloads constructor(
         // 평균 점선 + 라벨
         val avgY = topPad + chartH - ((avg / maxEff) * chartH).toFloat()
         canvas.drawLine(0f, avgY, chartW, avgY, avgPaint)
-        textPaint.textSize = 14f * dp
+        textPaint.textSize = 18f * dp
         canvas.drawText(
             String.format("평균 %.1f", avg),
             chartW + 8f * dp, avgY + textPaint.textSize / 3f, textPaint

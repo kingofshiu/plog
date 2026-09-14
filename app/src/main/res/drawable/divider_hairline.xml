@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 목록 행 사이 헤어라인 (주행 탭 v5) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#232326" />
+    <size android:height="1dp" />
+</shape>

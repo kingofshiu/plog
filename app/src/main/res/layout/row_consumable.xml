@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 소모품 한 줄 v2 (2026-09-13): 칩 대신 색 글자 상태, 진행 막대 색 단계(여유 흰색 → 곧 교체 주황 → 교체 필요 빨강), 큰 버튼 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -17,7 +18,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:orientation="vertical"
-            android:paddingEnd="24dp">
+            android:paddingEnd="28dp">
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -28,28 +29,23 @@
                     android:id="@+id/rcons_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textSize="23sp"
+                    android:textSize="@dimen/text_body"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="@color/text" />
                 <TextView
                     android:id="@+id/rcons_state"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textSize="15sp"
+                    android:textSize="@dimen/text_label"
                     android:fontFamily="sans-serif-medium"
-                    android:background="@drawable/bg_chip"
-                    android:paddingStart="12dp"
-                    android:paddingEnd="12dp"
-                    android:paddingTop="4dp"
-                    android:paddingBottom="4dp"
-                    android:layout_marginStart="12dp" />
+                    android:layout_marginStart="14dp" />
             </LinearLayout>
 
             <TextView
                 android:id="@+id/rcons_detail"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="17sp"
+                android:textSize="@dimen/text_label"
                 android:textColor="@color/text_sub"
                 android:layout_marginTop="6dp" />
 
@@ -57,7 +53,7 @@
                 android:id="@+id/rcons_bar"
                 style="@android:style/Widget.ProgressBar.Horizontal"
                 android:layout_width="match_parent"
-                android:layout_height="5dp"
+                android:layout_height="6dp"
                 android:layout_marginTop="12dp"
                 android:progressDrawable="@drawable/pb_soc" />
         </LinearLayout>
@@ -65,26 +61,29 @@
         <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="end">
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
             <TextView
                 android:id="@+id/rcons_remain"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="28sp"
+                android:textSize="@dimen/text_value_m"
                 android:fontFamily="sans-serif-light"
                 android:textColor="@color/text"
-                android:includeFontPadding="false" />
+                android:includeFontPadding="false"
+                android:minWidth="200dp"
+                android:gravity="end" />
             <Button
                 android:id="@+id/rcons_replace"
                 android:layout_width="wrap_content"
-                android:layout_height="42dp"
+                android:layout_height="52dp"
                 android:background="@drawable/bg_button_dim"
+                android:fontFamily="sans-serif-medium"
                 android:textColor="@color/text"
-                android:textSize="16sp"
-                android:paddingStart="18dp"
-                android:paddingEnd="18dp"
-                android:layout_marginTop="10dp"
+                android:textSize="@dimen/text_label"
+                android:paddingStart="26dp"
+                android:paddingEnd="26dp"
+                android:layout_marginStart="28dp"
                 android:text="교체함" />
         </LinearLayout>
     </LinearLayout>

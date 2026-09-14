@@ -7,24 +7,28 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="60dp"
+        android:layout_height="76dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="16dp">
-        <TextView
+        <!-- 뒤로가기 (2026-09-08 사용자: 더 크게) — 72dp 터치 영역, 셰브론 1.8배, 눌림 효과 -->
+        <ImageView
             android:id="@+id/td_back"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:gravity="center"
-            android:text="←"
-            android:textSize="24sp"
-            android:textColor="@color/text" />
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_chevron_left"
+            android:tint="@color/text"
+            android:scaleX="1.8"
+            android:scaleY="1.8"
+            android:background="?android:attr/selectableItemBackground"
+            android:contentDescription="뒤로" />
         <TextView
             android:id="@+id/td_title"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textSize="20sp"
+            android:textSize="@dimen/text_title"
             android:fontFamily="sans-serif-medium"
             android:textColor="@color/text" />
     </LinearLayout>
@@ -52,7 +56,11 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="거리"
-                android:textSize="18sp"
+                android:drawableStart="@drawable/ic_st_dist"
+                android:drawablePadding="10dp"
+                android:drawableTint="#C9C9CE"
+                android:gravity="center_vertical"
+                android:textSize="@dimen/text_body"
                 android:letterSpacing="0.25"
                 android:textColor="@color/text_sub" />
 
@@ -60,7 +68,7 @@
                 android:id="@+id/td_km"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textSize="76sp"
+                android:textSize="@dimen/text_value_xl"
                 android:fontFamily="sans-serif-light"
                 android:textColor="@color/text"
                 android:includeFontPadding="false"
@@ -73,11 +81,11 @@
                 android:orientation="horizontal"
                 android:baselineAligned="false">
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="시간" />
+                    <TextView style="@style/TdLabel" android:text="시간" android:drawableStart="@drawable/ic_st_time" />
                     <TextView android:id="@+id/td_time" style="@style/TdValue" />
                 </LinearLayout>
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="전비" />
+                    <TextView style="@style/TdLabel" android:text="전비" android:drawableStart="@drawable/ic_st_eff" />
                     <TextView android:id="@+id/td_eff" style="@style/TdValue" />
                 </LinearLayout>
             </LinearLayout>
@@ -89,13 +97,13 @@
                 android:layout_marginTop="20dp"
                 android:baselineAligned="false">
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="사용 전력" />
+                    <TextView style="@style/TdLabel" android:text="사용 전력" android:drawableStart="@drawable/ic_st_energy" />
                     <TextView android:id="@+id/td_energy" style="@style/TdValue" />
                 </LinearLayout>
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="배터리" />
+                    <TextView style="@style/TdLabel" android:text="배터리" android:drawableStart="@drawable/ic_st_battery" />
                     <TextView android:id="@+id/td_soc" style="@style/TdValue"
-                        android:textSize="29sp" />
+                        android:textSize="@dimen/text_title" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -106,11 +114,11 @@
                 android:layout_marginTop="20dp"
                 android:baselineAligned="false">
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="평균 속도" />
+                    <TextView style="@style/TdLabel" android:text="평균 속도" android:drawableStart="@drawable/ic_st_speed_avg" />
                     <TextView android:id="@+id/td_speed_avg" style="@style/TdValue" />
                 </LinearLayout>
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="최고 속도" />
+                    <TextView style="@style/TdLabel" android:text="최고 속도" android:drawableStart="@drawable/ic_st_speed_max" />
                     <TextView android:id="@+id/td_speed_max" style="@style/TdValue" />
                 </LinearLayout>
             </LinearLayout>
@@ -123,9 +131,11 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
+            <!-- 지도와 그래프를 같은 크기(1:1)로 고정 분배 -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="200dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:background="@drawable/bg_card">
                 <WebView
                     android:id="@+id/td_web"
@@ -137,10 +147,10 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="전비 비교 — 최근 주행 vs 이번 주행"
-                android:textSize="18sp"
+                android:textSize="@dimen/text_label"
                 android:letterSpacing="0.1"
                 android:textColor="@color/text_sub"
-                android:layout_marginTop="16dp" />
+                android:layout_marginTop="14dp" />
 
             <com.p4log.car.TripEffChartView
                 android:id="@+id/td_chart"

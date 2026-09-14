@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 글꼴 체계 (2026-09-08, 사용자: "앱 전체 글꼴 통일"). 모든 레이아웃·스타일은 이 값만 쓴다.
+     굵기 규칙: 라벨 = 보통(sans-serif), 본문·목록 제목·화면 제목·버튼 = 중간(sans-serif-medium), 숫자 = 가는(sans-serif-light) -->
+<resources>
+    <dimen name="text_small">18sp</dimen>     <!-- 보조: 그래프 눈금·범례·힌트 -->
+    <dimen name="text_label">21sp</dimen>     <!-- 라벨·캡션·목록 부제 -->
+    <dimen name="text_body">24sp</dimen>      <!-- 본문·목록 제목·인라인 값·탭 -->
+    <dimen name="text_title">30sp</dimen>     <!-- 화면 제목·월 제목 -->
+    <dimen name="text_value_m">36sp</dimen>   <!-- 통계 값 -->
+    <dimen name="text_value_l">52sp</dimen>   <!-- 칸 대표 숫자 -->
+    <dimen name="text_value_xl">80sp</dimen>  <!-- 히어로 숫자 -->
+    <dimen name="text_display">122sp</dimen>  <!-- 배터리 % 하나만 -->
+</resources>

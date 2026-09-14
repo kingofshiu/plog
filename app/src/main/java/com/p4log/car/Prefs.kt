@@ -27,13 +27,25 @@ object Prefs {
     fun odoOffsetKm(c: Context): Double = sp(c).getFloat("odo_offset_km", 0f).toDouble()
     fun setOdoOffsetKm(c: Context, v: Double) =
         sp(c).edit().putFloat("odo_offset_km", v.toFloat()).apply()
-    /** 표시용 총 누적주행 = 보정값 + GPS 누적 */
+    /** 표시용 총 누적주행 = 보정값 + 앱 누적(바퀴 틱 기반) */
     fun totalKm(c: Context): Double = odoOffsetKm(c) + lifetimeKm(c)
+    /** 누적주행이 설정됐는지 (계기판 값을 넣었거나 앱이 쌓은 거리가 있음). 없으면 주행 탭에서 "누적" 칸을 숨긴다 (2026-09-13) */
+    fun hasTotalKm(c: Context): Boolean = odoOffsetKm(c) > 0.0 || lifetimeKm(c) > 0.5
+
+    // 마지막 주차 사진 촬영이 실패했는지.
+    // 실패했을 때만 앱 실행 시 서비스를 포그라운드로 다시 띄운다 (평소엔 서비스를 건드리지 않는다)
+    fun photoFailed(c: Context): Boolean = sp(c).getBoolean("photo_failed", false)
+    fun setPhotoFailed(c: Context, v: Boolean) =
+        sp(c).edit().putBoolean("photo_failed", v).apply()
+
+    // 마지막으로 기록한 차량 속성 조사 결과 (같으면 로그에 다시 안 남긴다)
+    fun lastProbe(c: Context): String = sp(c).getString("last_probe", "") ?: ""
+    fun setLastProbe(c: Context, v: String) = sp(c).edit().putString("last_probe", v).apply()
 
     // Supabase 동기화 설정
     // 기본값 내장: 개인용 APK 전제 (이 APK를 남에게 줄 때는 두 값을 비우고 다시 빌드할 것)
-    private const val DEFAULT_SB_URL = "" // 본인 Supabase Project URL 입력 (선택 — 설정 화면에서도 입력 가능)
-    private const val DEFAULT_SB_KEY = "" // 본인 anon/publishable 키 입력 (선택)
+    private const val DEFAULT_SB_URL = ""   // 본인 Supabase Project URL (비워 두면 앱 설정 화면에서 입력)
+    private const val DEFAULT_SB_KEY = ""   // 본인 anon public 키
     fun supabaseUrl(c: Context): String =
         (sp(c).getString("sb_url", "") ?: "").ifBlank { DEFAULT_SB_URL }
     fun supabaseKey(c: Context): String =
@@ -56,4 +68,20 @@ object Prefs {
 
     fun lastSyncTs(c: Context): Long = sp(c).getLong("last_sync_ts", 0L)
     fun setLastSyncTs(c: Context, ts: Long) = sp(c).edit().putLong("last_sync_ts", ts).apply()
+
+    // 주행 중 표시 실험 (2026-09-05): 헤드업 알림 + 미디어 '지금 재생' 카드. 기본 꺼짐
+    fun driveDisplay(c: Context): Boolean = sp(c).getBoolean("drive_display", false)
+    // 주행 중 전체 화면 오버레이 (2026-09-05): 제품 기능이라 기본 켜짐. 진단 화면에서 끌 수 있다
+    fun driveOverlay(c: Context): Boolean = sp(c).getBoolean("drive_overlay", true)
+    fun setDriveOverlay(c: Context, v: Boolean) = sp(c).edit().putBoolean("drive_overlay", v).apply()
+    fun setDriveDisplay(c: Context, v: Boolean) = sp(c).edit().putBoolean("drive_display", v).apply()
+
+    // 주차 사진: 마지막으로 서버에 올린 촬영 시각 (같은 사진 중복 업로드 방지)
+    // 새 기록 알림을 이미 띄운 주행 id (2026-09-15) — 같은 주행으로 두 번 띄우지 않는다
+    fun lastAchievedTripId(c: Context): Long = sp(c).getLong("achieved_trip", 0L)
+    fun setLastAchievedTripId(c: Context, id: Long) = sp(c).edit().putLong("achieved_trip", id).apply()
+
+    fun lastPhotoUploadTs(c: Context): Long = sp(c).getLong("last_photo_up_ts", 0L)
+    fun setLastPhotoUploadTs(c: Context, ts: Long) =
+        sp(c).edit().putLong("last_photo_up_ts", ts).apply()
 }

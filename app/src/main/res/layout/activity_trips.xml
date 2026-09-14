@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 전체 주행 기록 v2 (2026-09-06, 사용자): 기간 탭(일간/주간/월간/연간/전체) + 기간 요약 + 왼쪽 목록 | 오른쪽 상세(정보+지도).
+     목록을 누르면 새 창이 아니라 오른쪽 칸에 지도와 정보가 바로 나온다. Activity와 오버레이 스택이 같이 쓴다 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <!-- 헤더 1줄: ← 제목 (사용자 2026-09-06: 더 크게, 누르기 쉽게 — 줄 전체가 뒤로가기) -->
+    <LinearLayout
+        android:id="@+id/tr_back"
+        android:layout_width="wrap_content"
+        android:layout_height="72dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="32dp"
+        android:background="?android:attr/selectableItemBackground">
+        <ImageView
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:scaleType="center"
+            android:src="@drawable/ic_chevron_left"
+            android:tint="@color/text"
+            android:scaleX="1.8"
+            android:scaleY="1.8"
+            android:contentDescription="뒤로" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="주행 기록"
+            android:textSize="@dimen/text_title"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/text"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+    <!-- 헤더 2줄 (사용자 2026-09-06: 제목 아래로, 더 크게): 기간 탭 | ◀ 기간 ▶ -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp"
+        android:paddingBottom="6dp">
+        <LinearLayout
+            android:id="@+id/tr_tabs"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView style="@style/PeriodTab" android:text="일간" />
+            <TextView style="@style/PeriodTab" android:text="주간" />
+            <TextView style="@style/PeriodTab" android:text="월간" />
+            <TextView style="@style/PeriodTab" android:text="연간" />
+            <TextView style="@style/PeriodTab" android:text="전체" />
+        </LinearLayout>
+
+        <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/tr_prev"
+            style="@style/MonthNavButton"
+            android:layout_width="72dp"
+            android:layout_height="54dp"
+            android:src="@drawable/ic_chevron_left"
+            android:contentDescription="이전" />
+        <TextView
+            android:id="@+id/tr_period"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="260dp"
+            android:gravity="center"
+            android:textSize="@dimen/text_body"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/text"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp" />
+        <ImageButton
+            android:id="@+id/tr_next"
+            style="@style/MonthNavButton"
+            android:layout_width="72dp"
+            android:layout_height="54dp"
+            android:src="@drawable/ic_chevron_right"
+            android:contentDescription="다음" />
+    </LinearLayout>
+
+    <!-- 기간 요약 -->
+    <LinearLayout
+        android:id="@+id/tr_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:baselineAligned="false"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="16dp">
+        <LinearLayout style="@style/TdCell">
+            <TextView style="@style/SumLabel" android:text="운행" android:drawableStart="@drawable/ic_st_log" />
+            <TextView android:id="@+id/tr_s_count" style="@style/SumValue" />
+        </LinearLayout>
+        <LinearLayout style="@style/TdCell">
+            <TextView style="@style/SumLabel" android:text="총 거리" android:drawableStart="@drawable/ic_st_dist" />
+            <TextView android:id="@+id/tr_s_km" style="@style/SumValue" />
+        </LinearLayout>
+        <LinearLayout style="@style/TdCell">
+            <TextView style="@style/SumLabel" android:text="총 시간" android:drawableStart="@drawable/ic_st_time" />
+            <TextView android:id="@+id/tr_s_time" style="@style/SumValue" />
+        </LinearLayout>
+        <LinearLayout style="@style/TdCell">
+            <TextView style="@style/SumLabel" android:text="배터리 사용" android:drawableStart="@drawable/ic_st_energy" />
+            <TextView android:id="@+id/tr_s_kwh" style="@style/SumValue" />
+        </LinearLayout>
+        <LinearLayout style="@style/TdCell">
+            <TextView style="@style/SumLabel" android:text="배터리 소모" android:drawableStart="@drawable/ic_st_battery" />
+            <TextView android:id="@+id/tr_s_soc" style="@style/SumValue" />
+        </LinearLayout>
+        <LinearLayout style="@style/TdCell">
+            <TextView style="@style/SumLabel" android:text="회생 회수" android:drawableStart="@drawable/ic_st_regen" />
+            <TextView android:id="@+id/tr_s_regen" style="@style/SumValue" android:textColor="@color/green" />
+        </LinearLayout>
+        <LinearLayout style="@style/TdCell">
+            <TextView style="@style/SumLabel" android:text="전비" android:drawableStart="@drawable/ic_st_eff" />
+            <TextView android:id="@+id/tr_s_eff" style="@style/SumValue" android:textColor="@color/accent" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 개인 최고 기록 (2026-09-15) -->
+    <TextView
+        android:id="@+id/tr_best"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="32dp"
+        android:layout_marginBottom="12dp"
+        android:textSize="@dimen/text_label"
+        android:textColor="@color/text_sub"
+        android:drawableStart="@drawable/ic_st_compare"
+        android:drawablePadding="8dp"
+        android:drawableTint="#8E8E93"
+        android:gravity="center_vertical"
+        android:visibility="gone" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="32dp"
+        android:layout_marginEnd="32dp"
+        android:background="#232326" />
+
+    <!-- 본문: 목록 | 상세 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:baselineAligned="false"
+        android:paddingStart="32dp"
+        android:paddingEnd="32dp">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+            <ListView
+                android:id="@+id/tr_list"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:divider="@drawable/divider_hairline"
+                android:dividerHeight="1dp"
+                android:listSelector="@android:color/transparent"
+                android:overScrollMode="never" />
+            <TextView
+                android:id="@+id/tr_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingTop="56dp"
+                android:text="이 기간엔 주행 기록이 없습니다"
+                android:drawableTop="@drawable/ic_st_log"
+                android:drawableTint="#5A5A60"
+                android:drawablePadding="16dp"
+                android:textSize="@dimen/text_label"
+                android:textColor="@color/text_sub"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="28dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp"
+            android:background="#232326" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.35">
+            <TextView
+                android:id="@+id/tr_d_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingTop="56dp"
+                android:text="왼쪽에서 주행을 고르면 지도와 정보가 여기에 나옵니다"
+                android:textSize="@dimen/text_label"
+                android:textColor="@color/text_sub" />
+            <LinearLayout
+                android:id="@+id/tr_d"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:visibility="gone">
+                <TextView
+                    android:id="@+id/tr_d_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="@dimen/text_body"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/text" />
+                <!-- 정보 3줄 × 3칸 (사용자 2026-09-06: "지도는 조금 작게, 정보는 더 잘 보이게") -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false"
+                    android:layout_marginTop="12dp">
+                    <LinearLayout style="@style/TdCell">
+                        <TextView style="@style/DetLabel" android:text="거리" android:drawableStart="@drawable/ic_st_dist" />
+                        <TextView android:id="@+id/tr_d_km" style="@style/DetValue" />
+                    </LinearLayout>
+                    <LinearLayout style="@style/TdCell">
+                        <TextView style="@style/DetLabel" android:text="시간" android:drawableStart="@drawable/ic_st_time" />
+                        <TextView android:id="@+id/tr_d_time" style="@style/DetValue" />
+                    </LinearLayout>
+                    <LinearLayout style="@style/TdCell">
+                        <TextView style="@style/DetLabel" android:text="전비" android:drawableStart="@drawable/ic_st_eff" />
+                        <TextView android:id="@+id/tr_d_eff" style="@style/DetValue" android:textColor="@color/accent" />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false"
+                    android:layout_marginTop="12dp">
+                    <LinearLayout style="@style/TdCell">
+                        <TextView style="@style/DetLabel" android:text="배터리 사용" android:drawableStart="@drawable/ic_st_energy" />
+                        <TextView android:id="@+id/tr_d_kwh" style="@style/DetValue" />
+                    </LinearLayout>
+                    <LinearLayout style="@style/TdCell">
+                        <TextView style="@style/DetLabel" android:text="배터리" android:drawableStart="@drawable/ic_st_battery" />
+                        <TextView android:id="@+id/tr_d_soc" style="@style/DetValue" />
+                    </LinearLayout>
+                    <LinearLayout style="@style/TdCell">
+                        <TextView style="@style/DetLabel" android:text="회생 회수" android:drawableStart="@drawable/ic_st_regen" />
+                        <TextView android:id="@+id/tr_d_regen" style="@style/DetValue" android:textColor="@color/green" />
+                    </LinearLayout>
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:baselineAligned="false"
+                    android:layout_marginTop="12dp">
+                    <LinearLayout style="@style/TdCell">
+                        <TextView style="@style/DetLabel" android:text="평균 속도" android:drawableStart="@drawable/ic_st_speed_avg" />
+                        <TextView android:id="@+id/tr_d_avg" style="@style/DetValue" />
+                    </LinearLayout>
+                    <LinearLayout style="@style/TdCell">
+                        <TextView style="@style/DetLabel" android:text="최고 속도" android:drawableStart="@drawable/ic_st_speed_max" />
+                        <TextView android:id="@+id/tr_d_max" style="@style/DetValue" />
+                    </LinearLayout>
+                    <LinearLayout style="@style/TdCell" />
+                </LinearLayout>
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/bg_card">
+                    <WebView
+                        android:id="@+id/tr_d_web"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent" />
+                </FrameLayout>
+            </LinearLayout>
+        </FrameLayout>
+    </LinearLayout>
+</LinearLayout>

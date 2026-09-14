@@ -9,7 +9,7 @@ data class StatusSnapshot(
     val socPct: Float? = null,           // 계산된 %
     val chargeRateKw: Float? = null,     // +충전 / -방전 (kW)
     val rangeKm: Float? = null,          // RANGE_REMAINING (km)
-    val speedKmh: Float? = null,         // 차량 속도 (km/h)
+    val speedKmh: Float? = null,         // 표시용 융합 속도 (차량·GPS·바퀴 중 최대, km/h — 2026-09-13부터. 이전엔 차량 원값)
     val gpsSpeedKmh: Float? = null,
     val ignition: Int? = null,           // IGNITION_STATE (2=OFF 3=ACC 4=ON)
     val portConnected: Boolean? = null,
@@ -22,7 +22,26 @@ data class StatusSnapshot(
     val chargeActive: Boolean = false,
     val chargeKwh: Double = 0.0,
     val todayKm: Double = 0.0,
-    val todayEff: Double? = null         // km/kWh
+    val todayEff: Double? = null,        // km/kWh
+    // 아래 3개는 차량이 주면 표시하고 없으면 숨긴다 (2026-09-01)
+    val tripRegenKwh: Double = 0.0,      // 이번 주행에서 회생으로 회수한 kWh (2026-09-05)
+    val todayRegenKwh: Double = 0.0,     // 오늘 저장된 주행의 회생 합계
+    // 이번 주행 전체의 소비/회생 전력 평균·최고 kW (2026-09-06, 주행 탭 계기용. 주행이 끝나도 다음 주행 시작까지 유지)
+    val tripConsumeAvgKw: Float = 0f,
+    val tripConsumePeakKw: Float = 0f,
+    val tripRegenAvgKw: Float = 0f,      // 회생 중(>0.05kW)인 샘플만의 평균
+    val tripRegenPeakKw: Float = 0f,
+    // 회생 사이클 (2026-09-08, 사용자 결정 "마지막 충전 이후" 기준): 저장된 주행 합계 + 진행 중인 주행
+    val cycleSinceTs: Long? = null,      // 마지막 충전 종료 시각 (없으면 전체 기간)
+    val cycleConsumeKwh: Double = 0.0,   // 충전 이후 소비 kWh (trip.energy_kwh 합 + 이번 주행 진행분)
+    val cycleRegenKwh: Double = 0.0,     // 충전 이후 회생 kWh
+    val tripEnergyKwh: Double = 0.0,     // 이번 주행 소비 kWh (진행 중, Wh 델타)
+    val cycleKm: Double = 0.0,           // 충전 이후 달린 km (저장된 주행 합 + 진행 중 주행, 2026-09-15 충전 사이클 패널)
+    val cycleSocEnd: Float? = null,      // 마지막 충전이 끝났을 때 배터리 % (없으면 null) → "N% 사용" 계산용
+    val usualRegenRatioPct: Float = 0f,  // 평소 회수 비율 % (최근 30일 주행 합계 기준)
+    val outsideTempC: Float? = null,     // 외기 온도
+    val chargeRemainMin: Int? = null,    // 충전 완료까지 남은 분
+    val chargeLimitPct: Float? = null    // 사용자가 차에서 설정한 충전 목표 %
 )
 
 data class Trip(
@@ -38,7 +57,10 @@ data class Trip(
     val startLat: Double?, val startLon: Double?,
     val endLat: Double?, val endLon: Double?,
     val polyline: String,     // JSON [[lat,lon],...]
-    val synced: Boolean = false
+    val synced: Boolean = false,
+    val regenKwh: Double? = null,  // 회생제동 회수 에너지 (v5, 2026-09-05)
+    val startPlace: String? = null, // 출발 동네 이름 (v6, 2026-09-06, PlaceNames 역지오코딩)
+    val endPlace: String? = null
 ) {
     val distanceKm: Double get() = distanceM / 1000.0
     val effKmPerKwh: Double? get() =
@@ -69,7 +91,8 @@ data class StationProfile(
     val lon: Double,
     val name: String,
     val operator: String?,    // 운영사 (환경공단 API busiNm)
-    val rate: Double?,        // 사용자 확정 단가(원/kWh) — null이면 미확정
+    val rate: Double?,        // 사용자 확정 단가(원/kWh) — null이면 미확정(로밍 단가표 적용)
+    val outputs: String? = null, // 충전기 정격 출력 목록 (kW, 쉼표 구분. 예 "50,100,200")
     val updatedTs: Long
 )
 
@@ -86,5 +109,6 @@ data class ParkingInfo(
     val ts: Long,
     val lat: Double,
     val lon: Double,
-    val socPct: Float?
+    val socPct: Float?,
+    val photoTs: Long? = null   // 주차 사진 촬영 시각 (없으면 사진 없음)
 )
