@@ -50,7 +50,12 @@ class LoggerService : Service(), LocationListener {
         // 주행 감지 파라미터
         private const val MOVE_START_KMH = 4.0      // 이 속도 이상이면 출발
         private const val MOVE_STOP_KMH = 2.0       // 이 속도 미만이면 정지 후보
-        private const val STOP_END_MS = 180_000L    // 3분 정지 시 주행 종료
+        // 주행 = 기어 D(또는 R)에 넣는 순간 ~ P에 넣는 순간 (사용자 결정 2026-09-17: "D단 시작 ~ P단 정지가 맞다").
+        //  예외 ① P에 넣었다가 PARK_END_MS 안에 다시 D/R → 같은 주행으로 이어짐 (잠깐 세운 것)
+        //  예외 ② D에 넣었다가 MIN_TRIP_M도 못 가고 P → 폐기 (기존 규칙)
+        //  시동 OFF는 즉시 종료. 정차 시간으로 끊는 규칙은 기어 값을 못 읽는 차량에서만(STOP_END_MS)
+        private const val PARK_END_MS = 60_000L       // P단 유지 시간 — 이 안에 다시 D/R이면 이어서 기록
+        private const val STOP_END_MS = 180_000L      // 기어 값을 못 읽을 때만: 3분 정지 → 종료
         private const val MIN_TRIP_M = 300.0        // 300m 미만 주행은 버림
         private const val MAX_JUMP_MS_SPEED = 60.0  // GPS 점프 필터 (m/s)
 
@@ -177,6 +182,8 @@ class LoggerService : Service(), LocationListener {
     // P단 주차 사진 (2026-09-15, 사용자: "P단에 두면 사진을 찍게"): 실차 로그상 주행 종료 시점엔 시동이 ACC(3)라
     // 카메라가 프레임을 안 준다(워밍업 0프레임). 시동 ON(4)에서 기어가 P로 바뀌는 순간 찍는다
     private var lastGear: Int? = null
+    private var lastUxLogGear: Int? = null  // UX 변경 로그 억제용 (기어가 바뀌거나 2분 지났을 때만 기록)
+    private var lastUxLogTs = 0L
     private var pPhotoTs = 0L               // 마지막 P단 촬영 시도 시각
     private var photoDuringTrip = false     // P단 촬영은 주행 상태에서 찍으므로 tripActive 가드를 이 플래그로 연다
     // 이번 주행 전체 소비/회생 전력 통계 (2026-09-06, 주행 탭 계기): 주행 시작 때만 리셋 → 끝나도 마지막 주행 값이 남는다
@@ -186,6 +193,13 @@ class LoggerService : Service(), LocationListener {
     private var tripWheelM = 0.0
     private var lastWheelTicks: LongArray? = null
     private var lastWheelMono = 0L
+    // 바퀴 속도 정확도 (2026-09-17, 사용자: "최고속도가 안 맞는다"): 샘플 간격은 속성 타임스탬프로, 같은 샘플을 다시 읽으면 직전 속도 유지(최대 4초)
+    private var lastWheelNs = 0L
+    private var lastWheelKmh = 0.0
+    private var lastWheelNewMono = 0L
+    private var prevSpeedKmh = 0.0        // 최고 속도는 두 샘플 연속으로 나온 값만 인정 (한 번 튄 값 제외)
+    private var parkSinceMs = 0L          // 주행 중 기어가 P로 있는 동안의 시작 시각 (D/R로 돌아오면 0)
+    private var energyCalK = 1.0          // 전력 적분 → 배터리 델타 보정 계수 (Db.energyCalibration, 주행 저장 때 갱신)
     // 속도 적분 거리 — 바퀴도 GPS도 못 쓸 때의 마지막 안전망
     private var tripSpeedM = 0.0
     private var lastTickMono = 0L
@@ -213,6 +227,8 @@ class LoggerService : Service(), LocationListener {
     private var chargeOutputs: String? = null   // 충전소의 충전기 정격 출력 목록 (kW, 쉼표 구분)
     private var chargeStLat: Double? = null
     private var chargeStLon: Double? = null
+    private var chargeKind: String? = null      // 내 충전기 "home"/"work" (프로필에서, 2026-09-24)
+    private var chargeTariff: String? = null    // "flat"/"tou"
 
     // 하트비트 알람을 마지막으로 건 시각 (elapsedRealtime)
     private var lastHeartbeatArm = 0L
@@ -247,6 +263,8 @@ class LoggerService : Service(), LocationListener {
         EvStations.init(this)
         carReader = CarDataReader(this)
         db = Db.get(this)
+        // 에너지 보정 계수 (v7): 저장된 주행의 Σ델타/Σ적분 (DB 초기화 뒤에 읽어야 한다 — 2026-09-17 크래시)
+        db.energyCalibration().let { c -> energyCalK = if (c[2] >= 5.0 && c[1] > 1.0) (c[0] / c[1]).coerceIn(0.7, 1.3) else 1.0 }
         createChannel()
         startAsForeground()
         carReader.connect()
@@ -282,9 +300,16 @@ class LoggerService : Service(), LocationListener {
         val uxOk = carReader.registerUxListener { st ->
             handler.post {
                 val snap = lastSnapshot
-                ServiceLog.add(this, "UX 변경 [" + st + "] 기어 " + gearName(carReader.gear()) +
-                    " / 속도 " + Math.round(snap.speedKmh?.toDouble() ?: 0.0) +
-                    " / 시동 " + (snap.ignition?.toString() ?: "?"))
+                // 기록은 기어가 바뀌었거나 마지막 기록에서 2분이 지났을 때만 (2026-09-17: 정체 구간에서 초 단위로 수십 줄이 쌓여
+                // 로그가 밀려나던 것). 오버레이 적용은 매번
+                val g = carReader.gear()
+                val nowMs = System.currentTimeMillis()
+                if (g != lastUxLogGear || nowMs - lastUxLogTs > 120_000L) {
+                    lastUxLogGear = g; lastUxLogTs = nowMs
+                    ServiceLog.add(this, "UX 변경 [" + st + "] 기어 " + gearName(g) +
+                        " / 속도 " + Math.round(snap.speedKmh?.toDouble() ?: 0.0) +
+                        " / 시동 " + (snap.ignition?.toString() ?: "?"))
+                }
                 applyDriveOverlay(st.contains("requiresDO=true"))
             }
         }
@@ -536,15 +561,26 @@ class LoggerService : Service(), LocationListener {
         // PERF_ODOMETER는 시스템 권한이라 막혀 있지만 WHEEL_TICK은 CAR_SPEED로 읽힌다.
         // 실차 확인: 4바퀴 지원, 1틱 = 24000μm. 시동 사이클마다 0으로 리셋되므로 델타만 쓴다
         val ticks = carReader.wheelTicks()
+        val tickNs = carReader.lastWheelTickNs
         val wheelDeltaM = wheelDeltaMeters(ticks)
-        val wheelDtSec = if (lastWheelMono > 0L) (mono - lastWheelMono) / 1000.0 else 0.0
-        if (ticks != null) { lastWheelTicks = ticks; lastWheelMono = mono }
+        // dt는 속성 자체의 샘플 시각으로 계산한다. 우리가 읽은 시각으로 나누면 차량 샘플 주기와 어긋나 속도가 최대 ±25% 튀고
+        // 그게 그대로 "최고 속도"로 남았다 (2026-09-17). 타임스탬프가 없는 차량이면 예전 방식
+        val sameSample = tickNs > 0L && tickNs == lastWheelNs
+        val wheelDtSec = when {
+            tickNs > 0L && lastWheelNs > 0L -> (tickNs - lastWheelNs) / 1e9
+            lastWheelMono > 0L -> (mono - lastWheelMono) / 1000.0
+            else -> 0.0
+        }
+        if (ticks != null) { lastWheelTicks = ticks; lastWheelMono = mono; lastWheelNs = tickNs; if (!sameSample) lastWheelNewMono = mono }
         if (tripActive) tripWheelM += wheelDeltaM
-        // 바퀴 기반 속도 — GPS가 없고 차량 속도가 0으로 고정돼도 움직임을 잡아낸다
-        val wheelKmh: Double =
-            if (wheelDeltaM > 0.0 && wheelDtSec > 0.5 && wheelDtSec < 10.0)
-                wheelDeltaM / wheelDtSec * 3.6
-            else 0.0
+        // 바퀴 기반 속도 — GPS가 없고 차량 속도가 0으로 고정돼도 움직임을 잡아낸다.
+        // 같은 샘플을 다시 읽은 경우(차량이 아직 새 값을 안 줌)엔 직전 속도를 최대 4초까지 유지 — 그 뒤엔 정지로 본다
+        val wheelKmh: Double = when {
+            sameSample && mono - lastWheelNewMono <= 4_000L -> lastWheelKmh
+            !sameSample && wheelDeltaM > 0.0 && wheelDtSec > 0.2 && wheelDtSec < 10.0 -> wheelDeltaM / wheelDtSec * 3.6
+            else -> 0.0
+        }
+        if (!sameSample) lastWheelKmh = wheelKmh
 
         val gpsFresh = lastLoc != null && (mono - lastLocElapsed) < 15_000L
         val gpsSpeedKmh: Float? =
@@ -555,19 +591,25 @@ class LoggerService : Service(), LocationListener {
         val speedKmh: Double =
             maxOf(maxOf(carSpeed ?: 0f, gpsSpeedKmh ?: 0f).toDouble(), wheelKmh)
 
-        // ----- 주행 감지 -----
+        // ----- 주행 감지: 기어 D/R = 시작, P = 종료 (2026-09-17 사용자 결정). 기어를 못 읽으면 속도 기준 폴백 -----
+        val gear = carReader.gear()   // 1=N 2=R 4=P 8=D
         if (!tripActive) {
-            if (speedKmh >= MOVE_START_KMH) {
+            if (gear != null) {
+                // 서비스가 주행 중에 (재)시작돼도 D/R이면 바로 잡는다. 시동 ON일 때만 (시동 끈 직후 굳은 기어 값 제외)
+                if ((gear == 8 || gear == 2) && ignition == 4) startTrip(now, batteryWh, socPct)
+            } else if (speedKmh >= MOVE_START_KMH) {
                 if (movingSinceMs == 0L) movingSinceMs = mono
                 if (mono - movingSinceMs >= TICK_MS) startTrip(now, batteryWh, socPct)
             } else {
                 movingSinceMs = 0L
             }
         } else {
-            if (speedKmh > tripMaxKmh) tripMaxKmh = speedKmh
+            // 최고 속도: 두 샘플 연속으로 나온 값(둘 중 작은 쪽)만 인정 — GPS·바퀴 한 번 튄 값이 최고로 남지 않게 (2026-09-17)
+            val sustained = Math.min(speedKmh, prevSpeedKmh)
+            if (sustained > tripMaxKmh) tripMaxKmh = sustained
             // 평균속도는 '움직인 시간'으로 낸다. 경과시간으로 나누면 신호대기와
-            // 주행 종료 판정용 3분 정차가 통째로 들어가 말이 안 되는 값이 나온다
-            if (speedKmh >= MOVE_STOP_KMH) tripMovingMs += TICK_MS
+            // 주행 종료 판정용 3분 정차가 통째로 들어가 말이 안 되는 값이 나온다. 시간은 실제 경과(tick 지연 포함)로 (2026-09-17)
+            if (speedKmh >= MOVE_STOP_KMH) tripMovingMs += if (lastTickMono > 0L) (mono - lastTickMono).coerceIn(500L, 10_000L) else TICK_MS
             // 속도 × 시간 적분. 차량 속도 속성만 살아 있으면 거리가 나온다
             val dtSec = if (lastTickMono > 0L) (mono - lastTickMono) / 1000.0 else 0.0
             // 250km/h 초과는 센서 튐으로 보고 적분에서 제외 (거리가 부풀지 않게)
@@ -580,9 +622,10 @@ class LoggerService : Service(), LocationListener {
             if (rateKw != null && dtSec > 0.2 && dtSec < 10.0)
                 tripNetIntegralKwh += rateKw * dtSec / 3600.0
             // P단 주차 사진: 시동 ON 상태에서 기어가 P로 바뀐 순간 (정지 중일 때만, 주행당 여러 번 가능 — 촬영 중이면 건너뜀)
-            val gear = carReader.gear()
-            if (gear == 4 && lastGear != null && lastGear != 4 && ignition == 4 && speedKmh < MOVE_STOP_KMH && !photoBusy) {
-                parkPhotoAtP(now, socPct)
+            if (gear == 4 && lastGear != null && lastGear != 4) {
+                if (ignition == 4 && speedKmh < MOVE_STOP_KMH && !photoBusy) parkPhotoAtP(now, socPct)
+                else ServiceLog.add(this, "P단 감지했지만 사진 건너뜀 [시동 " + (ignition?.toString() ?: "?") +
+                    " / 속도 " + Math.round(speedKmh) + " / 촬영 중 " + photoBusy + "]")   // 왜 안 찍혔는지 판정용 (2026-09-17)
             }
             lastGear = gear
             // 이번 주행 소비/회생 전력 평균·최고 (샘플 단위)
@@ -592,15 +635,19 @@ class LoggerService : Service(), LocationListener {
                 val r = rateKw.coerceAtLeast(0f)
                 if (r > 0.05f) { tripRegenSum += r; tripRegenCnt++; if (r > tripRegenPeak) tripRegenPeak = r }
             }
+            prevSpeedKmh = speedKmh
             val ignOff = ignition != null && ignition <= 2 // LOCK/OFF
-            if (speedKmh < MOVE_STOP_KMH) {
-                if (stoppedSinceMs == 0L) stoppedSinceMs = mono
-                if (ignOff || (mono - stoppedSinceMs >= STOP_END_MS)) {
-                    endTrip(now, batteryWh, socPct)
-                }
-            } else {
-                stoppedSinceMs = 0L
+            // 종료: P단이 PARK_END_MS 이상 유지되면 (그 안에 D/R로 돌아오면 같은 주행). 시동 OFF는 즉시.
+            // 기어 값을 못 읽는 차량만 옛 규칙(3분 정지). D단에서 아무리 오래 서 있어도 끝내지 않는다
+            if (gear == 4) { if (parkSinceMs == 0L) parkSinceMs = mono } else parkSinceMs = 0L
+            if (speedKmh < MOVE_STOP_KMH) { if (stoppedSinceMs == 0L) stoppedSinceMs = mono } else stoppedSinceMs = 0L
+            val reason = when {
+                ignOff -> "시동 OFF"
+                parkSinceMs > 0L && mono - parkSinceMs >= PARK_END_MS -> "P단 " + (PARK_END_MS / 1000) + "초 유지"
+                gear == null && stoppedSinceMs > 0L && mono - stoppedSinceMs >= STOP_END_MS -> "정지 " + (STOP_END_MS / 60_000) + "분 (기어 미확인)"
+                else -> null
             }
+            if (reason != null) endTrip(now, batteryWh, socPct, reason)
         }
 
         // ----- 충전 감지 -----
@@ -645,9 +692,12 @@ class LoggerService : Service(), LocationListener {
         refreshTodayCacheIfDayChanged()
         val curTripKm = tripDistanceM / 1000.0
         // 이번 주행 진행 중 소비 kWh (배터리 Wh 델타, 저장 때와 같은 식)
+        // 이번 주행 소비: 보정한 전력 적분(부드럽게 증가) 우선, 아직 작으면 배터리 Wh 델타(1008Wh 계단) (2026-09-17)
         val liveTripEnergyKwh = run {
             val sWh = tripStartWh
-            if (tripActive && sWh != null && batteryWh != null && sWh > batteryWh) (sWh - batteryWh) / 1000.0 else 0.0
+            val delta = if (tripActive && sWh != null && batteryWh != null && sWh > batteryWh) (sWh - batteryWh) / 1000.0 else 0.0
+            val net = -tripNetIntegralKwh
+            if (tripActive && net > 0.1) net * energyCalK else delta
         }
         val todayKm = todayKmCache + (if (tripActive) curTripKm else 0.0)
         val todayEff: Double? =
@@ -981,6 +1031,7 @@ class LoggerService : Service(), LocationListener {
         tripMovingMs = 0L
         tripRegenKwh = 0.0
         tripNetIntegralKwh = 0.0
+        prevSpeedKmh = 0.0
         lastGear = carReader.gear()
         tripConsumeSum = 0.0; tripConsumeCnt = 0; tripConsumePeak = 0f
         tripRegenSum = 0.0; tripRegenCnt = 0; tripRegenPeak = 0f
@@ -989,6 +1040,7 @@ class LoggerService : Service(), LocationListener {
         tripPoints = JSONArray()
         tripLastPoint = null
         stoppedSinceMs = 0L
+        parkSinceMs = 0L
         lastLoc?.let { appendTripPoint(it) }
         updateNotification("주행 기록 중")
         if (Prefs.driveOverlay(this) && !DriveOverlay.isShown()) {
@@ -1013,7 +1065,7 @@ class LoggerService : Service(), LocationListener {
         Log.i(TAG, "trip start")
     }
 
-    private fun endTrip(now: Long, batteryWh: Float?, socPct: Float?) {
+    private fun endTrip(now: Long, batteryWh: Float?, socPct: Float?, reason: String) {
         tripActive = false
         movingSinceMs = 0L
         stoppedSinceMs = 0L
@@ -1043,10 +1095,17 @@ class LoggerService : Service(), LocationListener {
             return
         }
         val sWh = tripStartWh
-        val energyKwh: Double? =
+        // 배터리 Wh 델타는 차량이 ~1008Wh 계단으로 보고해 13km 주행이 2.016 아니면 3.024로만 나온다(전비 6.5 ↔ 4.3 널뛰기, 2026-09-17 서버 기록 확인).
+        // → 전력 적분(2초 샘플, 매끈함)에 장기 보정 계수(최근 60건 Σ델타/Σ적분 — 계단 오차는 합계에서 상쇄)를 곱해 쓴다. 둘 다 저장해 둔다
+        val deltaKwh: Double? =
             if (sWh != null && batteryWh != null && sWh > batteryWh)
                 ((sWh - batteryWh) / 1000.0)
             else null
+        val netIntKwh = -tripNetIntegralKwh
+        val cal = db.energyCalibration()
+        energyCalK = if (cal[2] >= 5.0 && cal[1] > 1.0) (cal[0] / cal[1]).coerceIn(0.7, 1.3) else 1.0
+        val energyKwh: Double? =
+            if (netIntKwh > 0.1) Math.round(netIntKwh * energyCalK * 1000.0) / 1000.0 else deltaKwh
         // 움직인 시간 기준 평균. 이동 시간이 없으면(이상 상황) 경과시간으로 폴백
         val movingH = tripMovingMs / 3_600_000.0
         val avgKmh =
@@ -1065,7 +1124,9 @@ class LoggerService : Service(), LocationListener {
             startLat = first?.optDouble(0), startLon = first?.optDouble(1),
             endLat = last?.optDouble(0), endLon = last?.optDouble(1),
             polyline = tripPoints.toString(),
-            regenKwh = Math.round(tripRegenKwh * 1000.0) / 1000.0
+            regenKwh = Math.round(tripRegenKwh * 1000.0) / 1000.0,
+            energyDeltaKwh = deltaKwh,
+            energyIntKwh = if (netIntKwh > 0.0) Math.round(netIntKwh * 1000.0) / 1000.0 else null
         )
         val tripId = db.insertTrip(trip)
         tripSavedCount++
@@ -1075,11 +1136,12 @@ class LoggerService : Service(), LocationListener {
             src + " (평균 " + Math.round(avgKmh) + ", 최고 " + Math.round(tripMaxKmh) + ")" +
             " [바퀴 " + Math.round(tripWheelM) + " / GPS " + Math.round(tripDistanceM) +
             " / 속도 " + Math.round(tripSpeedM) + "m] [ux=" + carReader.uxRestrictionState() +
-            " / 회생 " + String.format("%.2f", tripRegenKwh) + "kWh]")
+            " / 회생 " + String.format("%.2f", tripRegenKwh) + "kWh] 종료: " + reason)
         // 회생 적분 검증: 순 적분(−소비+회생) vs 배터리 Wh 델타. 두 값이 비슷하면 2초 샘플링 적분이 믿을 만하다 (2026-09-15)
-        ServiceLog.add(this, "회생 검증: 전력 순적분 " + String.format("%.2f", tripNetIntegralKwh) + "kWh vs 배터리 델타 " +
-            (if (energyKwh != null) String.format("-%.2f", energyKwh) else "?") + "kWh [회생 " + String.format("%.2f", tripRegenKwh) +
-            " / 소비 적분 " + String.format("%.2f", tripRegenKwh - tripNetIntegralKwh) + "]")
+        ServiceLog.add(this, "에너지: 델타 " + (if (deltaKwh != null) String.format("%.2f", deltaKwh) else "?") +
+            " / 순적분 " + String.format("%.2f", netIntKwh) + " × 보정 " + String.format("%.3f", energyCalK) + " (n=" + cal[2].toInt() + ")" +
+            " → 채택 " + (if (energyKwh != null) String.format("%.2f", energyKwh) else "?") +
+            "kWh [회생 " + String.format("%.2f", tripRegenKwh) + " / 소비 적분 " + String.format("%.2f", tripRegenKwh + netIntKwh) + "]")
         Prefs.addLifetimeKm(this, trip.distanceKm)
         refreshTodayCache()
         // 주행이 차 안에 갇히지 않도록 즉시 동기화 (10분 쿨다운을 기다리다
@@ -1097,7 +1159,10 @@ class LoggerService : Service(), LocationListener {
             ServiceLog.add(this, "주차 위치 없음 (GPS 미수신) — 사진만 시도")
         }
         if (keepPhoto != null) ServiceLog.add(this, "주차 사진: P단에서 이미 촬영 (" + Fmt.time(keepPhoto) + ") → 재촬영 안 함")
-        else requestParkPhoto(loc != null)
+        else {
+            if (pPhotoTs > 0L) ServiceLog.add(this, "주차 사진: P단 촬영이 " + ((now - pPhotoTs) / 60_000L) + "분 전이라 종료 시점에 다시 시도")
+            requestParkPhoto(loc != null)
+        }
         Log.i(TAG, "trip saved: ${trip.distanceKm} km")
     }
 
@@ -1139,6 +1204,7 @@ class LoggerService : Service(), LocationListener {
         chargeOperator = null
         chargeRateOverride = null
         chargeOutputs = null
+        chargeKind = null; chargeTariff = null
         updateNotification("충전 기록 중")
         Log.i(TAG, "charge start")
 
@@ -1146,14 +1212,19 @@ class LoggerService : Service(), LocationListener {
         val loc = lastLoc
         chargeStLat = loc?.latitude
         chargeStLon = loc?.longitude
+        // 충전 흐름을 svclog에 남긴다 (2026-09-21: 실차 충전 9건이 전부 "미확인·로밍 단가"였는데 로그가 없어 원인을 못 봤다)
+        ServiceLog.add(this, "충전 시작 [위치 " + (if (loc != null) "있음" else "없음 — 충전소 인식 불가") + " / 배터리 " +
+            (socPct?.let { String.format("%.0f%%", it) } ?: "?") + "]")
         if (loc != null) {
             EvStations.resolveAsync(this, loc.latitude, loc.longitude) { found ->
                 handler.post {
+                    ServiceLog.add(this, "충전소 인식: " + (if (found != null) found.name else "실패") + " — " + EvStations.lastResolveNote)
                     if (chargeActive && found != null) {
                         chargeStation = found.name
                         chargeOperator = found.operator
                         chargeRateOverride = found.rate
                         chargeOutputs = found.outputs
+                        chargeKind = found.kind; chargeTariff = found.tariff
                         updateNotification("충전 기록 중 · ${found.name}")
                     }
                 }
@@ -1174,6 +1245,7 @@ class LoggerService : Service(), LocationListener {
         }
         if (kwh < MIN_CHARGE_KWH) {
             Log.i(TAG, "charge discarded (too small)")
+            ServiceLog.add(this, "충전 폐기: " + String.format("%.2f", kwh) + "kWh (너무 적음)")
             return
         }
         val type = if (chargeMaxKw > DC_THRESHOLD_KW) "DC" else "AC"
@@ -1185,18 +1257,46 @@ class LoggerService : Service(), LocationListener {
         val ratedKw = if (type == "AC") chargeMaxKw
                       else EvStations.ratedOutputFor(chargeOutputs, chargeMaxKw)
         val rate = chargeRateOverride ?: EvStations.roamingRate(ratedKw)
+        // 내 충전기(집·회사, 2026-09-24): 계량기는 교류 쪽 → 완속은 배터리 kWh ÷ 0.88 로 요금. 시간대 요금이면 한전 표(HomeTariff)
+        val kind = chargeKind
+        val meterKwh = HomeTariff.meterKwh(kwh, kind, type)
+        val tou = if (kind != null && chargeTariff == "tou") HomeTariff.touCost(chargeStartTs, now, chargeProfile.toString(), meterKwh) else null
+        val cost = tou?.cost ?: (meterKwh * rate)
         val session = ChargeSession(
             startTs = chargeStartTs, endTs = now,
             kwh = Math.round(kwh * 100.0) / 100.0,
-            cost = Math.round(kwh * rate).toDouble(),
+            cost = Math.round(cost).toDouble(),
             socStart = chargeStartSoc, socEnd = socPct,
             maxKw = Math.round(chargeMaxKw * 10.0) / 10.0,
             type = type,
             profile = chargeProfile.toString(),
             station = chargeStation,
-            stLat = chargeStLat, stLon = chargeStLon
+            stLat = chargeStLat, stLon = chargeStLon,
+            kind = kind
         )
-        db.insertCharge(session)
+        val chargeId = db.insertCharge(session)
+        // 충전 위치 동네 이름 (주행처럼, 2026-09-25) — 끝나면 synced=0 으로 다시 올라간다
+        if (session.stLat != null && session.stLon != null) PlaceNames.resolveChargeAsync(this, chargeId, session.stLat, session.stLon)
+        if (kind != null) ServiceLog.add(this, "내 충전기(" + (HomeTariff.kindLabel(kind) ?: kind) + ") · 계량 " + String.format("%.1f", meterKwh) + "kWh · " +
+            (if (tou != null) "한전 시간대 " + tou.summary() else "정액 " + String.format("%.1f", rate) + "원") + " → " + Math.round(cost) + "원")
+        ServiceLog.add(this, "충전 저장 " + String.format("%.2f", session.kwh) + "kWh " + type + " · 최대 " + String.format("%.1f", chargeMaxKw) + "kW · 단가 " +
+            String.format("%.1f", rate) + "원 (" + (if (chargeRateOverride != null) "충전소 기억값" else "로밍 단가표 " + Math.round(ratedKw) + "kW 구간") + ") · 충전소 " +
+            (chargeStation ?: "미확인"))
+        // 공식 요금표 자동 조회 (2026-09-21): 충전소 이름은 잡혔는데 기억된 단가가 없으면 ev.or.kr에서 이 구간 회원가를 읽어
+        // 이 기록의 요금을 다시 계산하고 충전소 프로필에 기억 → 다음부터는 조회 없이 그 단가. 주차 중 한 번, 최대 ~2분
+        val stName = chargeStation
+        if (stName != null && chargeRateOverride == null && kind == null) {
+            val stLat = chargeStLat; val stLon = chargeStLon; val op = chargeOperator; val outs = chargeOutputs
+            val bandIdx = FeeLookup.bandIndex(ratedKw)
+            FeeLookup.lookupAsync(this, stName, bandIdx) { r ->
+                if (r.rate != null) {
+                    db.updateChargeRate(chargeId, session.kwh, r.rate)
+                    if (stLat != null && stLon != null) db.upsertStationProfile(stLat, stLon, stName, op ?: r.cpo, r.rate, outs)
+                    lastSyncAttempt = 0L   // 바뀐 요금이 서버에 바로 올라가게
+                }
+                ServiceLog.add(this, "요금표 자동 조회: " + (if (r.rate != null) "적용 " else "실패 — ") + r.note)
+            }
+        }
         refreshCycleCache()   // 새 충전 = 회생 사이클 기준점 갱신
         Log.i(
             TAG, "charge saved: $kwh kWh $type, 정격 ${ratedKw}kW (실측 $chargeMaxKw, 후보 $chargeOutputs)" +

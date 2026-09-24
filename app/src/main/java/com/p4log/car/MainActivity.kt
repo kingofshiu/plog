@@ -37,6 +37,10 @@ class MainActivity : Activity() {
         DashboardPage.demo = debuggable && intent.getBooleanExtra("demo", false)
         DashboardPage.demoCharge = DashboardPage.demo && intent.getBooleanExtra("demo_charge", false)
         DashboardPage.demoParked = DashboardPage.demo && intent.getBooleanExtra("demo_parked", false)
+        // 요금표 자동 조회 시험 (디버그 빌드, 에뮬레이터): am start ... --es fee_test "충전소 이름" → 결과가 svclog/logcat에 남는다 (2026-09-21)
+        intent.getStringExtra("fee_test")?.takeIf { debuggable }?.let { name ->
+            FeeLookup.lookupAsync(this, name, 2) { r -> ServiceLog.add(this, "요금표 자동 조회 시험: " + (r.rate?.toString() ?: "없음") + " — " + r.note) }
+        }
         EvStations.init(this)
         // 탭바+페이지는 MainUi (주행 중 오버레이와 같은 코드, 2026-09-05)
         ui = MainUi(ActivityHost(this), findViewById(android.R.id.content))

@@ -29,6 +29,13 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+    // 차량·폰 공용 코드 (FeeLookup 등, 2026-09-22)
+    sourceSets {
+        main {
+            java.srcDirs += ['../shared/src/main/java']
+        }
+    }
+
     kotlinOptions {
         jvmTarget = '17'
     }

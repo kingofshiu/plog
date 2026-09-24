@@ -31,6 +31,10 @@ class ChargesPage(private val host: AppHost, root: View) : PageController {
     private val splitAc: View = root.findViewById(R.id.charges_split_ac)
     private val tvSplitDc: TextView = root.findViewById(R.id.charges_split_dc_text)
     private val tvSplitAc: TextView = root.findViewById(R.id.charges_split_ac_text)
+    private val splitHome: View = root.findViewById(R.id.charges_split_home)
+    private val splitOut: View = root.findViewById(R.id.charges_split_out)
+    private val tvSplitHome: TextView = root.findViewById(R.id.charges_split_home_text)
+    private val tvSplitOut: TextView = root.findViewById(R.id.charges_split_out_text)
 
     private val twCost = NumberTween(root.findViewById(R.id.charges_cost)) { Fmt.won(it) }
     private val twKwh = NumberTween(root.findViewById(R.id.charges_kwh)) { Fmt.kwh(it) }
@@ -58,6 +62,16 @@ class ChargesPage(private val host: AppHost, root: View) : PageController {
             v.findViewById<TextView>(R.id.rc_detail).text = buildString {
                 append(if (dc) "급속" else "완속")
                 append("  ·  ")
+                // 충전 위치 동네 이름 (2026-09-25, 주행 목록처럼). 없으면 지금 조회를 걸고 잠시 "위치 확인 중"
+                if (s.place != null) { append(s.place); append("  ·  ") }
+                else if (s.stLat != null && s.stLon != null) {
+                    append("위치 확인 중…  ·  ")
+                    PlaceNames.resolveChargeAsync(host.context, s.id, s.stLat, s.stLon) { p ->
+                        if (p == null) return@resolveChargeAsync
+                        items = items.map { if (it.id == s.id) it.copy(place = p) else it }
+                        notifyDataSetChanged()
+                    }
+                }
                 if (s.station != null) { append(s.station); append("  ·  ") }
                 if (s.socStart != null && s.socEnd != null) {
                     append(String.format("%.0f → %.0f%%", s.socStart, s.socEnd)); append("  ·  ")
@@ -76,7 +90,7 @@ class ChargesPage(private val host: AppHost, root: View) : PageController {
         btnPrev.setOnClickListener { move(-1); reload(animate = true) }
         btnNext.setOnClickListener { move(1); reload(animate = true) }
         for (i in 0 until tabs.childCount) tabs.getChildAt(i).setOnClickListener { selectTab(i) }
-        selectTab(MONTH, animate = false)
+        selectTab(Prefs.chargesPeriod(host.context, MONTH).coerceIn(0, tabs.childCount - 1), animate = false)   // 마지막 선택 기억 (2026-09-25)
     }
 
     override fun onShow() = reload(animate = false)
@@ -91,6 +105,7 @@ class ChargesPage(private val host: AppHost, root: View) : PageController {
 
     private fun selectTab(p: Int, animate: Boolean = true) {
         period = p
+        Prefs.setChargesPeriod(host.context, p)
         for (i in 0 until tabs.childCount) {
             val tv = tabs.getChildAt(i) as TextView
             val sel = i == p
@@ -163,6 +178,14 @@ class ChargesPage(private val host: AppHost, root: View) : PageController {
         splitDc.requestLayout()
         tvSplitDc.text = if (n > 0) String.format("급속 %s · %.0f%%", Fmt.kwh(dcKwh), dcW * 100) else "급속"
         tvSplitAc.text = if (n > 0) String.format("완속 %s · %.0f%%", Fmt.kwh(acKwh), (1 - dcW) * 100) else "완속"
+        // 집·회사 / 외부 비율 띠 (2026-09-24)
+        val homeKwh = items.filter { it.kind != null }.sumOf { it.kwh }
+        val hW = if (kwh > 0.01) (homeKwh / kwh).toFloat() else 0.5f
+        (splitHome.layoutParams as LinearLayout.LayoutParams).weight = Math.max(0.02f, hW)
+        (splitOut.layoutParams as LinearLayout.LayoutParams).weight = Math.max(0.02f, 1f - hW)
+        splitHome.requestLayout()
+        tvSplitHome.text = if (n > 0) String.format("집·회사 %s · %.0f%%", Fmt.kwh(homeKwh), hW * 100) else "집·회사"
+        tvSplitOut.text = if (n > 0) String.format("외부 %s · %.0f%%", Fmt.kwh(kwh - homeKwh), (1 - hW) * 100) else "외부"
 
         tvEmpty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
         if (animate) { rise(summary, 10f, 240); rise(listView, 18f, 240) }

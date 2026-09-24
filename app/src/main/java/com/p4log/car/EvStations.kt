@@ -22,12 +22,15 @@ object EvStations {
     @Volatile private var API_KEY_ENC = ""
     fun init(context: Context) { API_KEY_ENC = Prefs.dataGoKey(context) }
     private const val PROFILE_RADIUS_M = 150.0
-    private const val API_RADIUS_M = 300.0
+    // 300 → 200m (2026-09-21): 사용자 회사 충전기(등록 안 된 사내 완속)에서 227m 떨어진 아파트 충전소가 잘못 잡히는 것을 막는다.
+    // 집은 등록 충전소가 53~100m 안에 있어 200m로도 충분. 잘못 잡히면 단가가 엉뚱하게 기억되므로 못 잡는 쪽이 낫다
+    private const val API_RADIUS_M = 200.0
     private const val ROWS_PER_PAGE = 9999
     private const val MAX_PAGES = 6
 
     /** outputs: 그 충전소에 있는 충전기 정격 출력 목록 (kW, 쉼표 구분. 예 "50,100,200") */
-    data class Found(val name: String, val operator: String?, val rate: Double?, val outputs: String?)
+    data class Found(val name: String, val operator: String?, val rate: Double?, val outputs: String?,
+                     val kind: String? = null, val tariff: String? = null)
 
     private data class ApiHit(val name: String, val operator: String?, val lat: Double,
                               val lon: Double, val outputs: String?)
@@ -95,22 +98,40 @@ object EvStations {
         }.start()
     }
 
+    /** 마지막 resolve()가 왜 그 결과를 냈는지 (svclog용, 2026-09-21: 실차에서 전부 "미확인"이었는데 이유를 볼 수 없었다) */
+    @Volatile var lastResolveNote: String = ""
+        private set
+    /** 마지막 API 호출의 totalCount (0이면 zcode 문제 의심) */
+    @Volatile private var lastTotalCount = -1
+
     private fun resolve(context: Context, lat: Double, lon: Double): Found? {
         val db = Db.get(context)
         val prof = db.nearestStationProfile(lat, lon, PROFILE_RADIUS_M)
         // 출력 정보까지 있는 프로필이면 API 없이 끝. (v3 이전에 저장된 프로필은 출력이 없어
         //  한 번 더 API를 불러 채운다 — 그 다음부터는 다시 API 없이 인식된다)
+        if (prof != null && prof.kind != null) {
+            // 내 충전기(집·회사, 2026-09-24): 위치만으로 확정. API·요금표 조회 없음
+            lastResolveNote = "내 충전기 " + prof.name + " (" + (if (prof.tariff == "tou") "한전 시간대 요금" else "정액 " + (prof.rate ?: 0.0) + "원") + ")"
+            return Found(prof.name, prof.operator, prof.rate, prof.outputs, prof.kind, prof.tariff)
+        }
         if (prof != null && prof.outputs != null) {
             Log.i(TAG, "profile hit: ${prof.name} [${prof.outputs}kW]")
+            lastResolveNote = "프로필 적중 " + prof.name + (if (prof.rate != null) " (단가 " + prof.rate + ")" else " (단가 미확정)")
             return Found(prof.name, prof.operator, prof.rate, prof.outputs)
         }
+        if (API_KEY_ENC.isBlank()) { lastResolveNote = "API 키 없음"; return prof?.let { Found(it.name, it.operator, it.rate, null) } }
         val zcode = zcodeOf(lat, lon)
-        val hit = if (zcode != null) queryNearest(zcode, lat, lon) else null
+        if (zcode == null) { lastResolveNote = "좌표가 시도 상자 밖 (" + String.format("%.4f,%.4f", lat, lon) + ")"; return prof?.let { Found(it.name, it.operator, it.rate, null) } }
+        lastTotalCount = -1
+        val hit = queryNearest(zcode, lat, lon)
         if (hit == null) {
+            lastResolveNote = "API zcode " + zcode + " 총 " + lastTotalCount + "건 중 " + API_RADIUS_M.toInt() + "m 안 충전소 없음" +
+                (if (lastTotalCount == 0) " ← zcode가 틀렸거나 행정구역 코드 변경" else "")
             // API 실패/범위 밖 — 출력 없는 기존 프로필이라도 있으면 그걸로 인식만 한다
             return prof?.let { Found(it.name, it.operator, it.rate, null) }
         }
         Log.i(TAG, "api hit: ${hit.name} (${hit.operator}) [${hit.outputs}kW]")
+        lastResolveNote = "API 적중 " + hit.name + " (" + (hit.operator ?: "?") + ") [" + (hit.outputs ?: "출력 미상") + "kW]"
         db.upsertStationProfile(hit.lat, hit.lon, hit.name, hit.operator, null, hit.outputs)
         return Found(hit.name, hit.operator, prof?.rate, hit.outputs)
     }
@@ -123,7 +144,9 @@ object EvStations {
         Box("26", 34.95, 35.40, 128.75, 129.35), // 부산
         Box("31", 35.35, 35.75, 129.00, 129.50), // 울산
         Box("27", 35.60, 36.05, 128.35, 128.80), // 대구
-        Box("29", 35.05, 35.25, 126.70, 127.05), // 광주
+        // 2026-09-21 확인: 광주(29)·전남(46)은 API에서 0건 — 2026년 행정통합으로 "전남광주통합특별시" zcode 12 로 합쳐졌다.
+        // (PC에서 전 코드 조회: 12 → 32,835건 "전남광주통합특별시 신안군…", 29·46·42·45 → 0건). 사용자 집·회사(광주)가 이 때문에 전부 "미확인"이었다
+        Box("12", 35.05, 35.25, 126.70, 127.05), // 광주 (→ 전남광주통합특별시)
         Box("30", 36.15, 36.50, 127.25, 127.60), // 대전
         Box("36", 36.40, 36.75, 127.15, 127.40), // 세종
         Box("11", 37.42, 37.72, 126.75, 127.20), // 서울
@@ -133,7 +156,7 @@ object EvStations {
         Box("43", 36.00, 37.25, 127.25, 128.65), // 충북
         Box("44", 35.95, 37.10, 125.95, 127.40), // 충남
         Box("52", 35.30, 36.20, 126.35, 127.90), // 전북
-        Box("46", 33.90, 35.50, 125.05, 127.55), // 전남
+        Box("12", 33.90, 35.50, 125.05, 127.55), // 전남 (→ 전남광주통합특별시)
         Box("47", 35.55, 37.15, 127.80, 129.60), // 경북
         Box("48", 34.55, 35.95, 127.55, 129.30), // 경남
         Box("50", 33.10, 33.60, 126.10, 127.05)  // 제주
@@ -190,7 +213,7 @@ object EvStations {
                     when (event) {
                         XmlPullParser.START_TAG -> tag = parser.name
                         XmlPullParser.TEXT -> when (tag) {
-                            "totalCount" -> parser.text.trim().toIntOrNull()?.let { totalCount = it }
+                            "totalCount" -> parser.text.trim().toIntOrNull()?.let { totalCount = it; lastTotalCount = it }
                             "statNm" -> name = parser.text
                             "busiNm" -> op = parser.text
                             "lat" -> iLat = parser.text.trim().toDoubleOrNull()

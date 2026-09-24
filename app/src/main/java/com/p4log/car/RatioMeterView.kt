@@ -67,8 +67,10 @@ class RatioMeterView @JvmOverloads constructor(
         super.onDraw(canvas)
         val w = width.toFloat(); val h = height.toFloat()
         val dp = resources.displayMetrics.density
+        // 글자는 dimens_type.xml 단계만 (2026-09-21 사용자: "운전할 때 보기 힘들다" → 20dp → text_body)
+        val bodyPx = resources.getDimension(R.dimen.text_body)
         if (!hasData) {
-            hintPaint.textSize = 20f * dp
+            hintPaint.textSize = bodyPx
             canvas.drawText("충전 후 주행이 쌓이면 표시됩니다", w / 2f, h / 2f + hintPaint.textSize / 3f, hintPaint)
             return
         }
@@ -77,7 +79,7 @@ class RatioMeterView @JvmOverloads constructor(
         val top = Math.ceil((need / 10f).toDouble()).toFloat() * 10f
         val step = if (top <= 30f) 10f else 20f
 
-        val gTop = 26f * dp; val gH = 40f * dp
+        val gTop = 34f * dp; val gH = 40f * dp
         fun x(v: Float) = (v / top).coerceIn(0f, 1f) * w
         rect.set(0f, gTop, w, gTop + gH)
         canvas.drawRoundRect(rect, 8f * dp, 8f * dp, trackPaint)
@@ -90,7 +92,7 @@ class RatioMeterView @JvmOverloads constructor(
             canvas.drawLine(ax, gTop - 4f * dp, ax, gTop + gH + 4f * dp, avgPaint)
         }
         // 눈금
-        tickTextPaint.textSize = 20f * dp
+        tickTextPaint.textSize = bodyPx
         val tickY = gTop + gH
         var v = 0f
         while (v <= top + 0.01f) {
@@ -104,7 +106,7 @@ class RatioMeterView @JvmOverloads constructor(
             canvas.drawText(String.format("%.0f%%", v), tx, tickY + 8f * dp + tickTextPaint.textSize, tickTextPaint)
             v += step
         }
-        labelPaint.textSize = 19f * dp
+        labelPaint.textSize = bodyPx
         labelPaint.textAlign = Paint.Align.LEFT
         canvas.drawText("▏평소 " + String.format("%.0f%%", avg), 0f, gTop - 8f * dp, labelPaint)
         labelPaint.textAlign = Paint.Align.RIGHT

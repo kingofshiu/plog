@@ -30,6 +30,32 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical">
+        <!-- 시계 (2026-09-15 추가): 히어로 오른쪽 위 → 배터리 위 → 2026-09-21 상태 줄 맨 왼쪽(사용자 두 번 "별로").
+             차량 계기판 상태 바처럼 시각이 맨 앞, 세로 공간을 안 먹고 배터리 칸을 건드리지 않는다 -->
+        <TextView
+            android:id="@+id/dash_clock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="--:--"
+            android:textSize="@dimen/text_title"
+            android:fontFamily="sans-serif-light"
+            android:textColor="@color/text"
+            android:includeFontPadding="false" />
+        <TextView
+            android:id="@+id/dash_date"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="-"
+            android:textSize="@dimen/text_label"
+            android:textColor="#8E8E93"
+            android:includeFontPadding="false"
+            android:layout_marginStart="12dp" />
+        <View
+            android:layout_width="1dp"
+            android:layout_height="22dp"
+            android:background="#3A3A3E"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp" />
         <View
             android:id="@+id/dash_state_dot"
             android:layout_width="9dp"
@@ -139,33 +165,6 @@
             android:layout_height="wrap_content"
             android:layout_weight="1.9"
             android:orientation="vertical">
-        <!-- 시계 (2026-09-15, 사용자: "좋은 자리에 시계도"): 히어로 오른쪽 위, 가는 큰 숫자 + 날짜·요일 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="end|bottom"
-            android:layout_marginBottom="18dp">
-            <TextView
-                android:id="@+id/dash_date"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="-"
-                android:textSize="@dimen/text_label"
-                android:textColor="#8E8E93"
-                android:includeFontPadding="false"
-                android:paddingBottom="6dp"
-                android:layout_marginEnd="14dp" />
-            <TextView
-                android:id="@+id/dash_clock"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="--:--"
-                android:textSize="@dimen/text_value_l"
-                android:fontFamily="sans-serif-light"
-                android:textColor="@color/text"
-                android:includeFontPadding="false" />
-        </LinearLayout>
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -253,7 +252,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="-"
-                    android:textSize="@dimen/text_label"
+                    android:textSize="@dimen/text_body"
                     android:textColor="@color/text_sub"
                     android:layout_marginTop="6dp" />
                 <TextView
@@ -261,7 +260,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text=""
-                    android:textSize="@dimen/text_label"
+                    android:textSize="@dimen/text_body"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="@color/green"
                     android:drawableStart="@drawable/ic_st_compare"
@@ -285,7 +284,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="-"
-                    android:textSize="@dimen/text_label"
+                    android:textSize="@dimen/text_body"
                     android:textColor="@color/text_sub"
                     android:layout_marginTop="6dp" />
             </LinearLayout>
@@ -321,7 +320,7 @@
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:text="-"
-                    android:textSize="@dimen/text_label"
+                    android:textSize="@dimen/text_body"
                     android:textColor="@color/text_sub"
                     android:includeFontPadding="false"
                     android:paddingBottom="7dp"
@@ -336,7 +335,7 @@
                 android:orientation="horizontal"
                 android:gravity="bottom"
                 android:layout_marginTop="14dp">
-                <TextView style="@style/HdLabel" android:text="회생 회수" android:drawableStart="@drawable/ic_st_regen" android:drawablePadding="8dp" android:drawableTint="#8E8E93" android:gravity="center_vertical" android:paddingBottom="4dp" />
+                <TextView style="@style/HdLabel" android:text="회생 회수" android:textSize="@dimen/text_body" android:drawableStart="@drawable/ic_st_regen" android:drawablePadding="8dp" android:drawableTint="#8E8E93" android:gravity="center_vertical" android:paddingBottom="4dp" />
                 <TextView
                     android:id="@+id/dash_cycle_ratio"
                     android:layout_width="wrap_content"
@@ -361,7 +360,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="-"
-                    android:textSize="@dimen/text_label"
+                    android:textSize="@dimen/text_body"
                     android:textColor="@color/text_sub"
                     android:includeFontPadding="false"
                     android:paddingBottom="5dp"
@@ -370,7 +369,7 @@
             <com.p4log.car.RatioMeterView
                 android:id="@+id/dash_regen_chart"
                 android:layout_width="match_parent"
-                android:layout_height="112dp"
+                android:layout_height="124dp"
                 android:layout_marginTop="2dp" />
             <LinearLayout
                 android:layout_width="match_parent"
@@ -378,10 +377,10 @@
                 android:orientation="horizontal"
                 android:gravity="bottom"
                 android:layout_marginTop="10dp">
-                <TextView android:id="@+id/dash_regen_trip_label" style="@style/HdLabel" android:text="이번 주행" />
-                <TextView android:id="@+id/dash_regen_trip" style="@style/HdValue" android:textColor="@color/green" />
-                <TextView style="@style/HdLabel" android:text="비율" android:layout_marginStart="20dp" />
-                <TextView android:id="@+id/dash_regen_today" style="@style/HdValue" android:textColor="@color/green" />
+                <TextView android:id="@+id/dash_regen_trip_label" style="@style/HdLabel" android:text="이번 주행" android:textSize="@dimen/text_body" android:paddingBottom="3dp" />
+                <TextView android:id="@+id/dash_regen_trip" style="@style/HdValue" android:textSize="@dimen/text_title" android:textColor="@color/green" />
+                <TextView style="@style/HdLabel" android:text="비율" android:textSize="@dimen/text_body" android:paddingBottom="3dp" android:layout_marginStart="20dp" />
+                <TextView android:id="@+id/dash_regen_today" style="@style/HdValue" android:textSize="@dimen/text_title" android:textColor="@color/green" />
             </LinearLayout>
         </LinearLayout>
 

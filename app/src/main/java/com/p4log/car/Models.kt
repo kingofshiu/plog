@@ -59,6 +59,8 @@ data class Trip(
     val polyline: String,     // JSON [[lat,lon],...]
     val synced: Boolean = false,
     val regenKwh: Double? = null,  // 회생제동 회수 에너지 (v5, 2026-09-05)
+    val energyDeltaKwh: Double? = null, // 배터리 Wh 델타 원값 (v7, 2026-09-17 — 1008Wh 계단)
+    val energyIntKwh: Double? = null,   // 전력 순적분 원값 (v7). energyKwh = 적분 × 보정 계수
     val startPlace: String? = null, // 출발 동네 이름 (v6, 2026-09-06, PlaceNames 역지오코딩)
     val endPlace: String? = null
 ) {
@@ -81,6 +83,8 @@ data class ChargeSession(
     val station: String? = null,   // 자동 식별된 충전소 이름
     val stLat: Double? = null,     // 충전 위치 (프로필 저장용, 로컬 전용)
     val stLon: Double? = null,
+    val kind: String? = null,      // 내 충전기: "home" 집 / "work" 회사 / null 외부 (v8, 2026-09-24)
+    val place: String? = null,     // 충전 위치 동네 이름 "광산구 소촌동" (v9, 2026-09-25 — 주행 목록의 출발→도착처럼)
     val synced: Boolean = false
 )
 
@@ -93,6 +97,8 @@ data class StationProfile(
     val operator: String?,    // 운영사 (환경공단 API busiNm)
     val rate: Double?,        // 사용자 확정 단가(원/kWh) — null이면 미확정(로밍 단가표 적용)
     val outputs: String? = null, // 충전기 정격 출력 목록 (kW, 쉼표 구분. 예 "50,100,200")
+    val kind: String? = null,    // 내 충전기: "home"/"work" — 위치만으로 인식, API·요금표 조회 없음 (v8, 2026-09-24)
+    val tariff: String? = null,  // 내 충전기 요금 방식: "flat" 정액(rate) / "tou" 한전 시간대(HomeTariff)
     val updatedTs: Long
 )
 

@@ -62,6 +62,20 @@ object PlaceNames {
         }
     }
 
+    /** 충전 위치의 동네 이름을 채운다 (2026-09-25, 사용자: "충전소 위치도 목록에"). id가 음수(데모)면 DB엔 안 쓴다 */
+    fun resolveChargeAsync(context: Context, chargeId: Long, lat: Double, lon: Double, onDone: ((String?) -> Unit)? = null) {
+        val key = -1_000_000L - chargeId   // 주행 id와 겹치지 않게
+        synchronized(inFlight) { if (!inFlight.add(key)) return }
+        val app = context.applicationContext
+        exec.execute {
+            val p = lookup(app, lat, lon)
+            if (chargeId > 0 && p != null) { try { Db.get(app).setChargePlace(chargeId, p) } catch (t: Throwable) {} }
+            ServiceLog.add(app, "주소 조회 충전 #" + chargeId + ": " + (p ?: "?"))
+            synchronized(inFlight) { inFlight.remove(key) }
+            if (onDone != null) main.post { onDone(p) }
+        }
+    }
+
     /** VWorld getAddress: 지번(parcel) 기준 "구 동" — 예: "관악구 봉천동". 없으면 도로명 기준 */
     private fun vworld(lat: Double, lon: Double, key: String): String? {
         if (key.isBlank()) return null

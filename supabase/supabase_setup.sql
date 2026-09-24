@@ -42,8 +42,29 @@ create table if not exists charge (
   type text,
   profile text,
   station text,
+  edited_ts bigint,
+  st_lat double precision,
+  st_lon double precision,
+  kind text,
+  place text,
   unique (device_id, client_id)
 );
+
+-- v9 (2026-09-25): 충전 위치 동네 이름 (주행 start_place 처럼) — 차량이 VWorld 주소 API로 채워 올린다.
+-- 기존 서버에는 아래 한 줄만 실행하면 됨
+-- alter table charge add column if not exists place text;
+
+-- v8 (2026-09-24): 내 충전기 — 집('home')/회사('work') 표시. 차량이 올리고 폰에서도 지정할 수 있다.
+-- 기존 서버에는 아래 한 줄만 실행하면 됨
+-- alter table charge add column if not exists kind text;
+
+-- v7 (2026-09-22): 충전 위치 — 폰에서 "차량이 충전한 자리" 기준 지도로 충전소를 고르기 위해 차량 앱이 올린다.
+-- 기존 서버에는 아래 한 줄만 실행하면 됨 (실행하면 차량이 위치 있는 옛 충전도 한 번 다시 올린다)
+-- alter table charge add column if not exists st_lat double precision, add column if not exists st_lon double precision;
+
+-- v5 (2026-09-21): 폰/웹에서 요금·충전소를 고치면 edited_ts(ms)를 남기고, 차량이 동기화 때 받아간다 (양방향).
+-- 기존 서버에는 아래 한 줄만 실행하면 됨
+-- alter table charge add column if not exists edited_ts bigint;
 
 -- v2 (2026-08-09): 기존 서버에 적용할 때는 아래 한 줄만 실행하면 됨
 -- alter table charge add column if not exists station text;
@@ -102,3 +123,13 @@ create policy "p4log all" on trip for all using (true) with check (true);
 create policy "p4log all" on charge for all using (true) with check (true);
 create policy "p4log all" on parking for all using (true) with check (true);
 create policy "p4log all" on consumable for all using (true) with check (true);
+
+-- v6 (2026-09-21): 서버 사용량 (앱 설정 탭·폰 차량 탭 "서버 사용량"용). DB 크기와 행 수를 anon 키로 읽게 하는 함수.
+-- 기존 서버에는 아래 블록만 실행하면 됨
+create or replace function plog_usage() returns json language sql security definer as $$
+  select json_build_object(
+    'db_bytes', pg_database_size(current_database()),
+    'trips', (select count(*) from trip),
+    'charges', (select count(*) from charge));
+$$;
+grant execute on function plog_usage() to anon;

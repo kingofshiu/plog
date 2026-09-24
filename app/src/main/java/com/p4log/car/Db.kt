@@ -13,7 +13,7 @@ import android.database.sqlite.SQLiteOpenHelper
  * v5: trip.regen_kwh 회생제동으로 회수한 에너지 (2026-09-05, 주행 탭 표시용. 서버엔 아직 안 올림)
  * v6: trip.start_place / end_place 출발·도착 동네 이름 (2026-09-06, 주행 기록 목록용. 서버엔 안 올림)
  */
-class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log.db", null, 6) {
+class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log.db", null, 9) {
 
     /**
      * 매번 열릴 때 인덱스 보장 (2026-09-08, 기록이 쌓여도 기간 조회가 느려지지 않게).
@@ -44,7 +44,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 "polyline TEXT NOT NULL DEFAULT '[]'," +
                 "synced INTEGER NOT NULL DEFAULT 0," +
                 "regen_kwh REAL," +
-                "start_place TEXT, end_place TEXT)"
+                "start_place TEXT, end_place TEXT," +
+                "energy_delta_kwh REAL, energy_int_kwh REAL)"
         )
         db.execSQL(
             "CREATE TABLE charge (" +
@@ -60,6 +61,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 "profile TEXT NOT NULL DEFAULT '[]'," +
                 "station TEXT," +
                 "st_lat REAL, st_lon REAL," +
+                "kind TEXT," +
+                "place TEXT," +
                 "synced INTEGER NOT NULL DEFAULT 0)"
         )
         db.execSQL(CREATE_STATION_PROFILE)
@@ -116,6 +119,34 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
             db.execSQL("ALTER TABLE trip ADD COLUMN start_place TEXT")
             db.execSQL("ALTER TABLE trip ADD COLUMN end_place TEXT")
         }
+        if (oldVersion < 7) {
+            // v6 → v7: 에너지 원값 2종 (델타·적분). energy_kwh는 보정한 적분으로 바뀜 (2026-09-17). 기존 주행은 NULL
+            db.execSQL("ALTER TABLE trip ADD COLUMN energy_delta_kwh REAL")
+            db.execSQL("ALTER TABLE trip ADD COLUMN energy_int_kwh REAL")
+        }
+        if (oldVersion < 8) {
+            // v7 → v8: 내 충전기(집·회사) — charge.kind('home'/'work'), station_profile.kind + tariff('flat'/'tou') (2026-09-24).
+            // oldVersion 1이면 station_profile은 위에서 새 스키마로 만들어졌으니 charge만 ALTER
+            db.execSQL("ALTER TABLE charge ADD COLUMN kind TEXT")
+            if (oldVersion >= 2) {
+                db.execSQL("ALTER TABLE station_profile ADD COLUMN kind TEXT")
+                db.execSQL("ALTER TABLE station_profile ADD COLUMN tariff TEXT")
+            }
+        }
+        if (oldVersion < 9) {
+            // v8 -> v9: 충전 위치 동네 이름 (주행의 start_place 처럼, 2026-09-25). 기존 충전은 NULL -> 목록에서 볼 때 채운다
+            db.execSQL("ALTER TABLE charge ADD COLUMN place TEXT")
+        }
+    }
+
+    /** 에너지 보정용 합계: [Σ배터리 델타, Σ전력 순적분, 건수] — 최근 60건 중 둘 다 있는 주행 (v7) */
+    fun energyCalibration(): DoubleArray {
+        val c = readableDatabase.rawQuery(
+            "SELECT IFNULL(SUM(energy_delta_kwh),0), IFNULL(SUM(energy_int_kwh),0), COUNT(*) FROM (" +
+                "SELECT energy_delta_kwh, energy_int_kwh FROM trip " +
+                "WHERE energy_delta_kwh IS NOT NULL AND energy_int_kwh IS NOT NULL AND energy_int_kwh > 0.3 " +
+                "ORDER BY start_ts DESC LIMIT 60)", null)
+        c.use { return if (it.moveToFirst()) doubleArrayOf(it.getDouble(0), it.getDouble(1), it.getDouble(2)) else doubleArrayOf(0.0, 0.0, 0.0) }
     }
 
     private fun insertConsumableInternal(
@@ -151,6 +182,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         if (t.regenKwh != null) cv.put("regen_kwh", t.regenKwh) else cv.putNull("regen_kwh")
         if (t.startPlace != null) cv.put("start_place", t.startPlace)
         if (t.endPlace != null) cv.put("end_place", t.endPlace)
+        if (t.energyDeltaKwh != null) cv.put("energy_delta_kwh", t.energyDeltaKwh)
+        if (t.energyIntKwh != null) cv.put("energy_int_kwh", t.energyIntKwh)
         return writableDatabase.insert("trip", null, cv)
     }
 
@@ -190,7 +223,9 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
             if (i < 0 || c.isNull(i)) null else c.getDouble(i)
         },
         startPlace = c.getColumnIndex("start_place").let { i -> if (i < 0 || c.isNull(i)) null else c.getString(i) },
-        endPlace = c.getColumnIndex("end_place").let { i -> if (i < 0 || c.isNull(i)) null else c.getString(i) }
+        endPlace = c.getColumnIndex("end_place").let { i -> if (i < 0 || c.isNull(i)) null else c.getString(i) },
+        energyDeltaKwh = c.getColumnIndex("energy_delta_kwh").let { i -> if (i < 0 || c.isNull(i)) null else c.getDouble(i) },
+        energyIntKwh = c.getColumnIndex("energy_int_kwh").let { i -> if (i < 0 || c.isNull(i)) null else c.getDouble(i) }
     )
 
     /** 최근 주행 N건 (최신순) — 주행 탭의 최근 목록 */
@@ -289,6 +324,20 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         }
     }
 
+    /**
+     * "평소 전비" 기준 합계 (2026-09-21, 사용자 결정 "0.3 kWh 미만 주행 제외"): [거리 m 합, 에너지 kWh 합].
+     * 0.5~1 km 이동이 우연히 배터리 Wh 계단(1,008 Wh)을 넘어 1.008 kWh로 찍히면 전비 0.7 km/kWh짜리 기록이 되고,
+     * 에너지 0인 짧은 이동은 거리만 더해진다. 이 필터는 후자만 걸러낸다(실차 30일 51건 중 4건 제외, 평소 4.69 → 4.66).
+     * 1.008 kWh짜리 짧은 이동까지 빼려면 거리 필터(2 km)가 더 필요한데 사용자가 "이것만"이라 하여 넣지 않았다.
+     */
+    fun usualEffTotals(fromTs: Long): DoubleArray {
+        val c = readableDatabase.rawQuery(
+            "SELECT IFNULL(SUM(distance_m),0), IFNULL(SUM(energy_kwh),0) FROM trip WHERE start_ts >= ? AND energy_kwh >= 0.3",
+            arrayOf(fromTs.toString())
+        )
+        c.use { return if (it.moveToFirst()) doubleArrayOf(it.getDouble(0), it.getDouble(1)) else doubleArrayOf(0.0, 0.0) }
+    }
+
     /** 마지막 충전이 끝났을 때의 배터리 % (없으면 null). 충전 사이클 "N% 사용" 계산용 (2026-09-15) */
     fun lastChargeSocEnd(): Float? {
         val c = readableDatabase.rawQuery("SELECT soc_end FROM charge ORDER BY end_ts DESC LIMIT 1", null)
@@ -331,6 +380,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         if (s.station != null) cv.put("station", s.station) else cv.putNull("station")
         if (s.stLat != null) cv.put("st_lat", s.stLat) else cv.putNull("st_lat")
         if (s.stLon != null) cv.put("st_lon", s.stLon) else cv.putNull("st_lon")
+        if (s.kind != null) cv.put("kind", s.kind) else cv.putNull("kind")
+        if (s.place != null) cv.put("place", s.place) else cv.putNull("place")
         cv.put("synced", 0)
         return writableDatabase.insert("charge", null, cv)
     }
@@ -354,6 +405,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 else c.getDouble(c.getColumnIndexOrThrow("st_lat")),
         stLon = if (c.isNull(c.getColumnIndexOrThrow("st_lon"))) null
                 else c.getDouble(c.getColumnIndexOrThrow("st_lon")),
+        kind = if (c.isNull(c.getColumnIndexOrThrow("kind"))) null else c.getString(c.getColumnIndexOrThrow("kind")),
+        place = if (c.isNull(c.getColumnIndexOrThrow("place"))) null else c.getString(c.getColumnIndexOrThrow("place")),
         synced = c.getInt(c.getColumnIndexOrThrow("synced")) == 1
     )
 
@@ -379,6 +432,12 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         )
         c.use { while (it.moveToNext()) list.add(readCharge(it)) }
         return list
+    }
+
+    /** 위치 있는 충전을 전부 다시 올리게 표시 (2026-09-22 서버 v7 st_lat/st_lon 소급). 돌려주는 값 = 건수 */
+    fun unsyncChargesWithLocation(): Int {
+        val cv = ContentValues(); cv.put("synced", 0)
+        return writableDatabase.update("charge", cv, "st_lat IS NOT NULL", null)
     }
 
     fun markChargeSynced(id: Long) {
@@ -456,6 +515,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                else c.getDouble(c.getColumnIndexOrThrow("rate")),
         outputs = if (c.isNull(c.getColumnIndexOrThrow("outputs"))) null
                   else c.getString(c.getColumnIndexOrThrow("outputs")),
+        kind = if (c.isNull(c.getColumnIndexOrThrow("kind"))) null else c.getString(c.getColumnIndexOrThrow("kind")),
+        tariff = if (c.isNull(c.getColumnIndexOrThrow("tariff"))) null else c.getString(c.getColumnIndexOrThrow("tariff")),
         updatedTs = c.getLong(c.getColumnIndexOrThrow("updated_ts"))
     )
 
@@ -478,7 +539,7 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
     /** 60m 내 기존 프로필이 있으면 갱신, 없으면 생성. null로 넘긴 항목은 기존 값을 유지한다 */
     fun upsertStationProfile(
         lat: Double, lon: Double, name: String, operator: String?, rate: Double?,
-        outputs: String? = null
+        outputs: String? = null, kind: String? = null, tariff: String? = null
     ) {
         val existing = nearestStationProfile(lat, lon, 60.0)
         val cv = ContentValues()
@@ -486,6 +547,7 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         if (operator != null) cv.put("operator", operator)
         if (rate != null) cv.put("rate", rate)
         if (outputs != null) cv.put("outputs", outputs)
+        if (kind != null) { cv.put("kind", kind); cv.put("tariff", tariff ?: "flat") }   // 내 충전기 (2026-09-24)
         cv.put("updated_ts", System.currentTimeMillis())
         if (existing != null) {
             writableDatabase.update("station_profile", cv, "id = ?", arrayOf(existing.id.toString()))
@@ -497,9 +559,46 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
     }
 
     /** 사용자가 고른 충전소를 충전 기록에 기록 (이름 + 충전소 좌표). 재업로드 대상 (2026-09-08) */
+    /** 어떤 자리(반경 radiusM) 안에서 한 충전 전부 — 집·회사로 지정할 때 기존 기록에도 적용 (2026-09-24) */
+    fun chargesNear(lat: Double, lon: Double, radiusM: Double): List<ChargeSession> {
+        val out = ArrayList<ChargeSession>()
+        val d = FloatArray(1)
+        val c = readableDatabase.rawQuery("SELECT * FROM charge WHERE st_lat IS NOT NULL AND st_lon IS NOT NULL", null)
+        c.use {
+            while (it.moveToNext()) {
+                val s = readCharge(it)
+                android.location.Location.distanceBetween(lat, lon, s.stLat!!, s.stLon!!, d)
+                if (d[0] <= radiusM) out.add(s)
+            }
+        }
+        return out
+    }
+
+    /** 내 충전기 지정: 종류·이름·요금을 바꾸고 재업로드 대상으로 (2026-09-24) */
+    fun setChargeKind(id: Long, kind: String, station: String, cost: Double) {
+        val cv = ContentValues()
+        cv.put("kind", kind); cv.put("station", station); cv.put("cost", Math.round(cost).toDouble()); cv.put("synced", 0)
+        writableDatabase.update("charge", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    /** 충전 위치 동네 이름 저장 + 재업로드 (2026-09-25) */
+    fun setChargePlace(id: Long, place: String) {
+        val cv = ContentValues(); cv.put("place", place); cv.put("synced", 0)
+        writableDatabase.update("charge", cv, "id = ?", arrayOf(id.toString()))
+    }
+
     fun setChargeStation(id: Long, name: String, lat: Double, lon: Double) {
         val cv = ContentValues()
         cv.put("station", name); cv.put("st_lat", lat); cv.put("st_lon", lon); cv.put("synced", 0)
+        writableDatabase.update("charge", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    /** 폰(웹)에서 고친 요금·충전소를 반영 (2026-09-21 양방향). 서버가 원본이므로 재업로드 표시는 안 한다 */
+    fun applyRemoteChargeEdit(id: Long, cost: Double, station: String?, kind: String? = null) {
+        val cv = ContentValues()
+        cv.put("cost", cost)
+        if (station != null) cv.put("station", station)
+        if (kind != null) cv.put("kind", kind)
         writableDatabase.update("charge", cv, "id = ?", arrayOf(id.toString()))
     }
 
@@ -558,6 +657,7 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 "operator TEXT," +
                 "rate REAL," +
                 "outputs TEXT," +
+                "kind TEXT, tariff TEXT," +
                 "updated_ts INTEGER NOT NULL DEFAULT 0)"
 
         @Volatile private var instance: Db? = null

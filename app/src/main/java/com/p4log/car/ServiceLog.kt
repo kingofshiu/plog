@@ -17,7 +17,8 @@ object ServiceLog {
     private const val FILE = "p4log_svclog"
     private const val KEY_LINES = "lines"
     private const val KEY_ALIVE = "last_alive"
-    private const val MAX_LINES = 120
+    // 120줄이면 주행 한 번의 UX 변경 로그만으로 꽉 차서 전날 기록이 밀려났다 (2026-09-17 실차) → 400줄 (~35KB)
+    private const val MAX_LINES = 400
 
     private val fmt = SimpleDateFormat("MM-dd HH:mm:ss", Locale.KOREA)
 

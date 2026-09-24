@@ -135,6 +135,50 @@
                     android:textSize="@dimen/text_label"
                     android:textColor="@color/text_sub"
                     android:layout_marginTop="12dp" />
+                <!-- 서버 사용량 / 무료 한도 (2026-09-21, 사용자: "글자만으론 판단이 어렵다" → 막대): 탭을 열 때와 [연결 테스트] 때 갱신 -->
+                <TextView style="@style/HeroLabel" android:text="서버 사용량 · 무료 한도" android:drawableStart="@drawable/ic_st_server" android:layout_marginTop="22dp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="10dp">
+                    <TextView style="@style/HdLabel" android:text="데이터베이스" />
+                    <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+                    <TextView android:id="@+id/set_usage_db" style="@style/HdValue" android:text="확인 중…" />
+                </LinearLayout>
+                <ProgressBar
+                    android:id="@+id/set_usage_db_bar"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="8dp"
+                    android:max="1000"
+                    android:progressDrawable="@drawable/pb_soc" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="16dp">
+                    <TextView style="@style/HdLabel" android:text="사진·로그 저장소" />
+                    <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+                    <TextView android:id="@+id/set_usage_st" style="@style/HdValue" android:text="확인 중…" />
+                </LinearLayout>
+                <ProgressBar
+                    android:id="@+id/set_usage_st_bar"
+                    style="@android:style/Widget.ProgressBar.Horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="8dp"
+                    android:layout_marginTop="8dp"
+                    android:max="1000"
+                    android:progressDrawable="@drawable/pb_soc" />
+                <TextView
+                    android:id="@+id/set_usage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="@dimen/text_small"
+                    android:textColor="#8E8E93"
+                    android:layout_marginTop="10dp"
+                    android:text="" />
             </LinearLayout>
         </LinearLayout>
 

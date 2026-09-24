@@ -170,6 +170,10 @@ class CarDataReader(private val context: Context) {
      * PERF_ODOMETER와 달리 WHEEL_TICK은 시스템 권한이 아니라 CAR_SPEED(런타임 권한)를 쓰므로
      * 사이드로드 앱도 접근 가능성이 있다 — 실차에서 되는지 확인이 필요하다.
      */
+    /** 마지막 WHEEL_TICK 샘플의 차량 타임스탬프(elapsedRealtimeNanos). 바퀴 속도의 dt는 이걸로 계산한다 (2026-09-17). 0이면 미지원 */
+    @Volatile var lastWheelTickNs = 0L
+        private set
+
     fun wheelTicks(): LongArray? {
         val mgr = propMgr ?: run { if (!connect()) return null; propMgr ?: return null }
         val id = propId("WHEEL_TICK")
@@ -182,6 +186,7 @@ class CarDataReader(private val context: Context) {
                 Int::class.javaPrimitiveType, Int::class.javaPrimitiveType
             ).invoke(mgr, longArrClass, id, AREA_GLOBAL)
             if (cpv == null) { diag["WHEEL_TICK"] = "값 없음(null)"; return null }
+            lastWheelTickNs = try { (cpv.javaClass.getMethod("getTimestamp").invoke(cpv) as? Long) ?: 0L } catch (e: Throwable) { 0L }
             val raw = cpv.javaClass.getMethod("getValue").invoke(cpv)
             val boxed = raw as? Array<*> ?: run {
                 diag["WHEEL_TICK"] = "예상 못한 타입: " + (raw?.javaClass?.simpleName ?: "null")

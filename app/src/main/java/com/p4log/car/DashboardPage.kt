@@ -321,9 +321,10 @@ class DashboardPage(private val host: AppHost, root: View) : PageController {
     private fun reloadHistory() {
         val trips = if (demo) demoTrips() else Db.get(host.context).recentTrips(6)
         lastTrip = trips.firstOrNull()
+        // 평소 전비 = 최근 30일 거리 합 / 에너지 합. 0.3 kWh 미만 주행은 제외 (2026-09-21 사용자 결정, Db.usualEffTotals 주석)
         usualEff = if (demo) 5.9 else {
-            val u = Db.get(host.context).tripTotals(System.currentTimeMillis() - 30L * 86_400_000L, Long.MAX_VALUE)
-            if (u[2] > 0.5 && u[1] > 500.0) u[1] / 1000.0 / u[2] else null
+            val u = Db.get(host.context).usualEffTotals(System.currentTimeMillis() - 30L * 86_400_000L)
+            if (u[1] > 0.5 && u[0] > 500.0) u[0] / 1000.0 / u[1] else null
         }
         checkAchievement(trips)
         recentList.removeAllViews()

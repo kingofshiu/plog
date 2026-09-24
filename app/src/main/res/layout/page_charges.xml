@@ -114,6 +114,37 @@
             android:textSize="@dimen/text_label"
             android:textColor="@color/blue" />
     </LinearLayout>
+    <!-- 집·회사 / 외부 비율 띠 (2026-09-24, 사용자: "집밥 비율은 보자, 절약 금액은 빼자") -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="6dp"
+        android:orientation="horizontal"
+        android:layout_marginTop="14dp">
+        <View android:id="@+id/charges_split_home" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@color/green" />
+        <View android:layout_width="3dp" android:layout_height="match_parent" android:background="@color/bg" />
+        <View android:id="@+id/charges_split_out" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="#5A5A60" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+        <TextView
+            android:id="@+id/charges_split_home_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textSize="@dimen/text_label"
+            android:textColor="@color/green" />
+        <TextView
+            android:id="@+id/charges_split_out_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="end"
+            android:textSize="@dimen/text_label"
+            android:textColor="#8E8E93" />
+    </LinearLayout>
 
     <View
         android:layout_width="match_parent"

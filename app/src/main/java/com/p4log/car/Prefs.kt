@@ -44,8 +44,8 @@ object Prefs {
 
     // Supabase 동기화 설정
     // 기본값 내장: 개인용 APK 전제 (이 APK를 남에게 줄 때는 두 값을 비우고 다시 빌드할 것)
-    private const val DEFAULT_SB_URL = ""   // 본인 Supabase Project URL (비워 두면 앱 설정 화면에서 입력)
-    private const val DEFAULT_SB_KEY = ""   // 본인 anon public 키
+    private const val DEFAULT_SB_URL = ""
+    private const val DEFAULT_SB_KEY = ""
     fun supabaseUrl(c: Context): String =
         (sp(c).getString("sb_url", "") ?: "").ifBlank { DEFAULT_SB_URL }
     fun supabaseKey(c: Context): String =
@@ -64,8 +64,8 @@ object Prefs {
 
     // 지도·충전소 API 키도 설정 화면에서 입력할 수 있게 (2026-09-15, 공개 릴리즈 APK용 — 소스에 키를 안 넣고 빌드해도 쓸 수 있도록).
     // 기본값은 개인 빌드에만 들어 있다. 공개 저장소·릴리즈 APK에서는 빈 문자열
-    private const val DEFAULT_VWORLD_KEY = ""   // vworld.kr 인증키 (비워 두면 앱 설정 화면에서 입력)
-    private const val DEFAULT_DATA_GO_KEY = ""   // data.go.kr 일반 인증키(Encoding) (비워 두면 앱 설정 화면에서 입력)
+    private const val DEFAULT_VWORLD_KEY = ""
+    private const val DEFAULT_DATA_GO_KEY = ""
     fun vworldKey(c: Context): String = (sp(c).getString("vworld_key", "") ?: "").ifBlank { DEFAULT_VWORLD_KEY }
     fun setVworldKey(c: Context, v: String) = sp(c).edit().putString("vworld_key", v.trim()).apply()
     /** data.go.kr 일반 인증키 — URL 인코딩된(Encoding) 값 그대로. 재인코딩 금지 */
@@ -92,6 +92,20 @@ object Prefs {
     // 새 기록 알림을 이미 띄운 주행 id (2026-09-15) — 같은 주행으로 두 번 띄우지 않는다
     fun lastAchievedTripId(c: Context): Long = sp(c).getLong("achieved_trip", 0L)
     fun setLastAchievedTripId(c: Context, id: Long) = sp(c).edit().putLong("achieved_trip", id).apply()
+
+    // 폰에서 고친 충전 기록을 어디까지 받아왔는지 (서버 charge.edited_ts, 2026-09-21 양방향 동기화)
+    // 충전 위치(st_lat/st_lon) 소급 업로드를 했는지 (2026-09-22, SQL v7 뒤 한 번)
+    fun chargeLocBackfillDone(c: Context): Boolean = sp(c).getBoolean("charge_loc_backfill", false)
+    fun setChargeLocBackfillDone(c: Context) = sp(c).edit().putBoolean("charge_loc_backfill", true).apply()
+
+    // 기간 탭 마지막 선택 (2026-09-25, 사용자: "항상 월간으로 떠서 불편") — 충전 탭·주행 기록 화면
+    fun chargesPeriod(c: Context, dflt: Int): Int = sp(c).getInt("charges_period", dflt)
+    fun setChargesPeriod(c: Context, p: Int) = sp(c).edit().putInt("charges_period", p).apply()
+    fun tripsPeriod(c: Context, dflt: Int): Int = sp(c).getInt("trips_period", dflt)
+    fun setTripsPeriod(c: Context, p: Int) = sp(c).edit().putInt("trips_period", p).apply()
+
+    fun lastChargePullTs(c: Context): Long = sp(c).getLong("charge_pull_ts", 0L)
+    fun setLastChargePullTs(c: Context, ts: Long) = sp(c).edit().putLong("charge_pull_ts", ts).apply()
 
     fun lastPhotoUploadTs(c: Context): Long = sp(c).getLong("last_photo_up_ts", 0L)
     fun setLastPhotoUploadTs(c: Context, ts: Long) =

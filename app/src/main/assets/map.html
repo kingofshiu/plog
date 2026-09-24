@@ -19,6 +19,14 @@
   }
   #legend .sw { display:inline-block; width:11px; height:11px; border-radius:2px;
     margin-right:5px; vertical-align:-1px; }
+  /* 앱 문법(순흑·헤어라인·2dp 각)에 맞춘 지도 UI (2026-09-22, 사용자: "지도 선택 UI가 앱과 너무 달라 괴리감") */
+  .leaflet-tooltip.p4 { background:#141416; color:#F2F2F2; border:1px solid #3A3A3E; border-radius:2px;
+    font:500 15px sans-serif; padding:6px 10px; box-shadow:none; }
+  .leaflet-tooltip-top.p4:before { border-top-color:#3A3A3E; }
+  .leaflet-container { background:#000; }
+  .leaflet-bar { border:1px solid #3A3A3E; border-radius:2px; box-shadow:none; }
+  .leaflet-bar a, .leaflet-bar a:hover { background:#141416; color:#F2F2F2; border-bottom:1px solid #3A3A3E; }
+  .leaflet-bar a:last-child { border-bottom:none; }
 </style>
 </head>
 <body>
@@ -185,7 +193,8 @@
   function showPoint(lat, lon) {
     if (!initMap()) return;
     clearOverlays();
-    L.marker([lat, lon]).addTo(map);
+    /* 파란 기본 핀 대신 앱 포인트색 점 + 흰 테두리 (2026-09-22, 지도 UI 앱 문법 통일) */
+    L.circleMarker([lat, lon], { radius: 11, color: "#FFFFFF", weight: 3, fillColor: "#FF7500", fillOpacity: 1 }).addTo(map);
     map.invalidateSize();
     setTimeout(function () { map.invalidateSize(); map.setView([lat, lon], 17); }, 250);
   }
@@ -203,7 +212,7 @@
         html: '<div style="width:34px;height:34px;border-radius:17px;background:#FF7500;color:#000;font:700 18px sans-serif;' +
               'display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(0,0,0,.6)">' + (i + 1) + '</div>' });
       L.marker([p[0], p[1]], { icon: icon }).addTo(map)
-        .bindTooltip(p[2], { permanent: true, direction: "top", offset: [0, -20], opacity: 0.95 })
+        .bindTooltip(p[2], { permanent: true, direction: "top", offset: [0, -20], opacity: 1, className: "p4" })
         .on("click", function () { if (window.P4 && P4.pick) P4.pick(i); });
       bounds.push([p[0], p[1]]);
     });

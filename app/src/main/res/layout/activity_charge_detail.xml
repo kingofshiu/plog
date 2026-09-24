@@ -113,10 +113,123 @@
                     <TextView android:id="@+id/cd_rate" style="@style/TdValue" />
                 </LinearLayout>
                 <LinearLayout style="@style/TdCell">
-                    <TextView style="@style/TdLabel" android:text="충전소" android:drawableStart="@drawable/ic_st_station" />
+                    <TextView android:id="@+id/cd_station_label" style="@style/TdLabel" android:text="충전소" android:drawableStart="@drawable/ic_st_station" />
                     <TextView android:id="@+id/cd_station" style="@style/TdValue"
                         android:textSize="@dimen/text_body"
                         android:fontFamily="sans-serif-medium" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 내 충전기(집·회사)일 때: 계량 kWh · 시간대 구성 (2026-09-24) -->
+            <TextView
+                android:id="@+id/cd_kind_note"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="@dimen/text_label"
+                android:textColor="@color/text_sub"
+                android:layout_marginTop="14dp"
+                android:visibility="gone" />
+
+            <!-- 충전소 선택 패널 (2026-09-22): 지도 마커를 고르면 대화상자 대신 여기에 앱 문법으로 표시 —
+                 이름·사업자·정격 / 공식 요금표 단가(큰 숫자, 바로 고칠 수 있는 입력) / 5구간 한 줄 / 상태 문구 / 저장·보조 버튼 -->
+            <LinearLayout
+                android:id="@+id/cd_pick_panel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="22dp"
+                android:visibility="gone">
+                <TextView style="@style/TdLabel" android:text="선택한 충전소" android:drawableStart="@drawable/ic_st_station" />
+                <TextView
+                    android:id="@+id/cd_pk_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="@dimen/text_title"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/text"
+                    android:includeFontPadding="false"
+                    android:layout_marginTop="6dp"
+                    android:singleLine="true"
+                    android:ellipsize="end" />
+                <TextView
+                    android:id="@+id/cd_pk_sub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="@dimen/text_label"
+                    android:textColor="@color/text_sub"
+                    android:layout_marginTop="4dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#232326" android:layout_marginTop="16dp" android:layout_marginBottom="14dp" />
+                <TextView android:id="@+id/cd_pk_fee_label" style="@style/TdLabel" android:text="공식 요금표" android:drawableStart="@drawable/ic_st_won" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="bottom"
+                    android:layout_marginTop="2dp">
+                    <EditText
+                        android:id="@+id/cd_pk_rate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minWidth="120dp"
+                        android:background="@null"
+                        android:padding="0dp"
+                        android:inputType="numberDecimal"
+                        android:textSize="@dimen/text_value_l"
+                        android:fontFamily="sans-serif-light"
+                        android:textColor="@color/accent"
+                        android:includeFontPadding="false"
+                        android:imeOptions="actionDone" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="원/kWh"
+                        android:textSize="@dimen/text_body"
+                        android:fontFamily="sans-serif-light"
+                        android:textColor="#8E8E93"
+                        android:includeFontPadding="false"
+                        android:paddingBottom="6dp"
+                        android:layout_marginStart="8dp" />
+                    <TextView
+                        android:id="@+id/cd_pk_bands"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:textSize="@dimen/text_small"
+                        android:textColor="#8E8E93"
+                        android:includeFontPadding="false"
+                        android:paddingBottom="7dp"
+                        android:layout_marginStart="22dp"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                </LinearLayout>
+                <TextView
+                    android:id="@+id/cd_pk_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="@dimen/text_label"
+                    android:textColor="@color/text_sub"
+                    android:layout_marginTop="8dp" />
+                <Button
+                    android:id="@+id/cd_pk_save"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="18dp"
+                    android:background="@drawable/bg_button"
+                    android:textColor="#000000"
+                    android:textSize="@dimen/text_label"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="이 단가로 저장" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="12dp">
+                    <Button android:id="@+id/cd_pk_web" android:layout_width="0dp" android:layout_weight="1" android:layout_height="56dp"
+                        android:background="@drawable/bg_button_dim" android:textColor="@color/text" android:textSize="@dimen/text_label" android:fontFamily="sans-serif-medium" android:text="요금표 웹" />
+                    <Button android:id="@+id/cd_pk_naver" android:layout_width="0dp" android:layout_weight="1" android:layout_height="56dp" android:layout_marginStart="12dp"
+                        android:background="@drawable/bg_button_dim" android:textColor="@color/text" android:textSize="@dimen/text_label" android:fontFamily="sans-serif-medium" android:text="네이버 지도" />
+                    <Button android:id="@+id/cd_pk_cancel" android:layout_width="0dp" android:layout_weight="1" android:layout_height="56dp" android:layout_marginStart="12dp"
+                        android:background="@drawable/bg_button_dim" android:textColor="@color/text" android:textSize="@dimen/text_label" android:fontFamily="sans-serif-medium" android:text="닫기" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -140,6 +253,21 @@
                 android:textSize="@dimen/text_label"
                 android:fontFamily="sans-serif-medium"
                 android:text="단가 수정 (실제 결제 금액으로)" />
+            <!-- 내 충전기 등록 (2026-09-24): 이 자리를 집/회사로 기억 → 위치만으로 인식, 요금은 정액 또는 한전 시간대 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="12dp">
+                <Button android:id="@+id/cd_set_home" android:layout_width="0dp" android:layout_weight="1" android:layout_height="56dp"
+                    android:background="@drawable/bg_button_dim" android:textColor="@color/text" android:textSize="@dimen/text_label" android:fontFamily="sans-serif-medium"
+                    android:drawableStart="@drawable/ic_st_home" android:drawablePadding="10dp" android:drawableTint="@color/text" android:paddingStart="22dp" android:paddingEnd="22dp"
+                    android:text="이 자리를 집으로" />
+                <Button android:id="@+id/cd_set_work" android:layout_width="0dp" android:layout_weight="1" android:layout_height="56dp" android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_button_dim" android:textColor="@color/text" android:textSize="@dimen/text_label" android:fontFamily="sans-serif-medium"
+                    android:drawableStart="@drawable/ic_st_work" android:drawablePadding="10dp" android:drawableTint="@color/text" android:paddingStart="22dp" android:paddingEnd="22dp"
+                    android:text="이 자리를 회사로" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- 우측 (v3, 사용자 2026-09-08): 위 충전소 위치 지도, 아래 충전 타임라인(ChargeStripView) -->

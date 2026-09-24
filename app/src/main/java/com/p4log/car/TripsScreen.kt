@@ -209,6 +209,7 @@ object TripsScreen {
 
         fun selectTab(p: Int) {
             period = p
+            Prefs.setTripsPeriod(ctx, p)
             for (i in 0 until tabs.childCount) {
                 val tv = tabs.getChildAt(i) as TextView
                 val sel = i == p
@@ -248,7 +249,7 @@ object TripsScreen {
         listView.setOnItemClickListener { _, _, position, _ ->
             showDetail(items[position]); adapter.notifyDataSetChanged()
         }
-        selectTab(MONTH)
+        selectTab(Prefs.tripsPeriod(ctx, MONTH).coerceIn(0, tabs.childCount - 1))   // 마지막 선택 기억 (2026-09-25)
         return true
     }
 }

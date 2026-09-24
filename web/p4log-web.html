@@ -78,6 +78,10 @@
   .split .dc { background:var(--dc); } .split .ac { background:var(--ac); }
   .splitlbl { display:flex; justify-content:space-between; font-size:13px; margin-top:6px; }
   .splitlbl .a { color:var(--dc);} .splitlbl .b { color:var(--ac);}
+  .split .home { background:var(--green); } .split .out { background:#5A5A60; }
+  .splitlbl .h { color:var(--green);} .splitlbl .o { color:var(--muted);}
+  .kindbtns { display:flex; gap:10px; }
+  .kindbtns .morebtn .ic { width:18px; height:18px; vertical-align:-3px; margin-right:6px; }
   /* 목록 */
   .row { display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid var(--line); cursor:pointer; }
   .row:active { background:#111; }
@@ -96,6 +100,15 @@
   .empty { display:flex; flex-direction:column; align-items:center; gap:12px; color:var(--muted); font-size:14px;
     padding:34px 0 24px; text-align:center; line-height:1.6; }
   .empty .ic { width:30px; height:30px; color:var(--dim); }
+  /* 목록 쪽수 (2026-09-25, 사용자: "더 보기는 기록이 쌓이면 과부하 → 1 2 3 4 5 번호로") — 기간 탭과 같은 강조 */
+  .pager { display:none; justify-content:center; align-items:center; gap:4px; margin-top:14px; }
+  .pager.on { display:flex; }
+  .pager span { min-width:36px; height:36px; padding:0 6px; display:flex; align-items:center; justify-content:center; border-radius:2px;
+    font-size:14px; font-weight:500; color:var(--sub); cursor:pointer; user-select:none; }
+  .pager span.on { color:var(--accent); background:rgba(255,117,0,.15); }
+  .pager span.nav { color:var(--muted); font-size:18px; }
+  .pager span.dim { opacity:.3; pointer-events:none; }
+  .pager .cnt { font-size:12.5px; color:var(--muted); margin-left:8px; cursor:default; }
   .morebtn { display:none; width:100%; margin-top:10px; background:#1E1E22; color:var(--text); border:none;
     border-radius:2px; padding:13px 8px; font-size:15px; font-weight:500; cursor:pointer; }
   .morebtn:active { background:#2C2C31; }
@@ -138,7 +151,11 @@
   .sheet .inner { background:#0A0A0B; width:min(720px,100%); max-height:94vh; overflow-y:auto; border-radius:10px 10px 0 0;
     padding:8px 20px calc(24px + env(safe-area-inset-bottom)); animation:up .28s ease-out; border-top:1px solid var(--line2); }
   @keyframes up { from { transform:translateY(40px); opacity:0;} to { transform:none; opacity:1;} }
+  /* 손잡이: 아래로 끌면 시트가 따라 내려오다 닫힌다 (2026-09-25, 사용자 요청). 잡기 쉽게 위아래 여백을 손잡이 영역에 포함 */
   .sheet .grip { width:40px; height:4px; background:#3A3A3E; border-radius:2px; margin:6px auto 12px; }
+  .sheet .griparea { padding:6px 0 2px; margin:-8px 0 0; cursor:grab; touch-action:none; }
+  .sheet .inner.dragging { animation:none; transition:none; }
+  .sheet .inner.settle { animation:none; transition:transform .22s ease-out; }
   .sheet .head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
   .sheet .head b { font-size:19px; font-weight:500; flex:1; }
   .sheet .close { width:40px; height:40px; display:flex; align-items:center; justify-content:center; color:var(--sub); font-size:22px; cursor:pointer; border-radius:2px; background:#1E1E22; }
@@ -151,11 +168,35 @@
   .chart-wrap2 { height:220px; margin-top:6px; }
   .ps-login input { width:100%; background:transparent; border:none; border-bottom:1px solid var(--line2); color:var(--text);
     padding:10px 2px; font-size:16px; margin-bottom:10px; outline:none; }
+  /* 충전 시트 안 단가·충전소 수정 (2026-09-21, 양방향) */
+  .editrow { display:grid; grid-template-columns:1fr 110px; gap:10px; margin-top:8px; }
+  .editrow input { width:100%; background:transparent; border:none; border-bottom:1px solid var(--line2); color:var(--text);
+    padding:10px 2px; font-size:16px; outline:none; }
+  .editrow input:focus { border-color:var(--accent); }
+  #cd-edit-msg { font-size:13px; color:var(--muted); margin-top:8px; min-height:18px; }
+  /* 충전소 지도 선택 (2026-09-22): 차량 앱과 같은 문법 — 순흑 툴팁·주황 번호 마커·큰 단가 숫자 */
+  .leaflet-tooltip.p4 { background:#141416; color:#F2F2F2; border:1px solid #3A3A3E; border-radius:2px; font:500 12.5px sans-serif; padding:4px 8px; box-shadow:none; }
+  .leaflet-tooltip-top.p4:before { border-top-color:#3A3A3E; }
+  .leaflet-container { background:#000; }
+  #cs-map { height:280px; border-radius:2px; overflow:hidden; margin-top:10px; }
+  .pk-rate { background:transparent; border:none; color:var(--accent); font-size:34px; font-weight:300; width:118px; padding:0; outline:none; }
+  #cs-list { margin-top:4px; }
+  .cs-row { display:flex; align-items:center; gap:12px; padding:10px 2px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .cs-row:active { background:#141416; }
+  .cs-row .no { width:26px; height:26px; border-radius:13px; background:var(--accent); color:#000; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; flex:none; }
+  .cs-row .nm { flex:1; font-size:15px; font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cs-row .ds { color:var(--muted); font-size:13px; flex:none; }
+  .morebtn.accent { background:var(--accent); color:#000; }
+  .morebtn:disabled { color:var(--muted); }
 </style>
 </head>
 <body>
 
-<!-- 최초 접속: 연결 정보 입력 (URL 해시에 저장) -->
+<!-- 저장된 연결이 있으면 설정 화면 대신 이것만 잠깐 (2026-09-25, 사용자: "다시 실행할 때 초기 화면 안 뜨게") -->
+<div id="boot" style="display:none;text-align:center;margin-top:38vh;color:var(--muted);font-size:14px">
+  <div style="font-size:26px;font-weight:600;color:var(--text);margin-bottom:10px">P.Log</div>연결 중…
+</div>
+<!-- 최초 접속: 연결 정보 입력 (URL 해시 + localStorage 에 저장) -->
 <div id="setup">
   <h1 style="margin-bottom:24px;font-size:24px;font-weight:600">P.Log</h1>
   <label>Supabase Project URL</label>
@@ -166,6 +207,8 @@
   <input id="in-dev" placeholder="p4-123456">
   <label>VWorld 지도 인증키 (선택 — 없으면 지도만 안 보임)</label>
   <input id="in-vw" placeholder="vworld.kr에서 발급">
+  <label>충전소 정보 API 키 (data.go.kr 일반 인증키 Encoding, 선택 — 지도에서 충전소 고를 때)</label>
+  <input id="in-dg" placeholder="data.go.kr에서 발급">
   <button onclick="connect()">불러오기</button>
   <div id="err"></div>
   <p style="color:var(--muted);font-size:12.5px;margin-top:14px;line-height:1.6">
@@ -200,7 +243,7 @@
     <div class="sum" id="t-sum"></div>
     <div class="hair"></div>
     <div id="t-list"></div>
-    <button id="t-more" class="morebtn" onclick="tShowAll()"></button>
+    <div id="t-pager" class="pager"></div>
 
     <div class="sec">
       <div class="lbl" id="km-chart-lbl"></div>
@@ -225,9 +268,12 @@
     </div>
     <div class="split"><i class="dc" id="c-split-dc"></i><i class="ac" id="c-split-ac"></i></div>
     <div class="splitlbl"><span class="a" id="c-split-a">급속</span><span class="b" id="c-split-b">완속</span></div>
+    <!-- 집·회사 / 외부 (2026-09-24) -->
+    <div class="split" style="margin-top:12px"><i class="home" id="c-split-home"></i><i class="out" id="c-split-out"></i></div>
+    <div class="splitlbl"><span class="h" id="c-split-h">집·회사</span><span class="o" id="c-split-o">외부</span></div>
     <div class="hair"></div>
     <div id="c-list"></div>
-    <button id="c-more" class="morebtn" onclick="cShowAll()"></button>
+    <div id="c-pager" class="pager"></div>
 
     <div class="sec">
       <div class="lbl" id="cost-chart-lbl"></div>
@@ -265,6 +311,17 @@
     <div class="hair"></div>
     <div class="lbl" id="cons-lbl"></div>
     <div id="cons-list"></div>
+    <div class="hair"></div>
+    <!-- 서버 사용량 / 무료 한도 (2026-09-21) -->
+    <div class="lbl" id="usage-lbl"></div>
+    <div id="usage-box" style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:13.5px;color:var(--sub)"><span>DB</span><span id="usage-db">확인 중…</span></div>
+      <div class="cons" style="padding:6px 0 0;border:none"><div class="bar"><i id="usage-db-bar" style="width:0%"></i></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:13.5px;color:var(--sub);margin-top:12px"><span>사진·로그 저장소</span><span id="usage-st">확인 중…</span></div>
+      <div class="cons" style="padding:6px 0 0;border:none"><div class="bar"><i id="usage-st-bar" style="width:0%"></i></div></div>
+      <div id="usage-note" style="font-size:12.5px;color:var(--muted);margin-top:10px;line-height:1.6"></div>
+      <button class="morebtn" style="display:block;margin-top:16px" onclick="disconnect()">연결 해제 — 다른 서버·차량 ID로 바꾸기</button>
+    </div>
   </section>
 
   <nav class="tabbar">
@@ -276,7 +333,7 @@
 
 <!-- 주행 상세 시트 -->
 <div id="modal" class="sheet" onclick="if(event.target===this)closeModal()"><div class="inner">
-  <div class="grip"></div>
+  <div class="griparea"><div class="grip"></div></div>
   <div class="head"><b id="modal-title"></b><span class="close" onclick="closeModal()">✕</span></div>
   <div class="lbl" id="td-hero-label"></div>
   <div class="val xl accent" id="td-hero"></div>
@@ -295,14 +352,63 @@
 
 <!-- 충전 상세 시트 -->
 <div id="cmodal" class="sheet" onclick="if(event.target===this)closeCModal()"><div class="inner">
-  <div class="grip"></div>
+  <div class="griparea"><div class="grip"></div></div>
   <div class="head"><b id="cmodal-title"></b><span id="cmodal-type" class="typetxt"></span><span class="close" onclick="closeCModal()">✕</span></div>
   <div class="lbl" id="cd-hero-label"></div>
   <div class="val xl" id="cd-hero"></div>
   <div class="val accent" id="cd-cost" style="font-size:26px;margin-top:2px"></div>
   <div class="dgrid" id="cmodal-grid"></div>
+  <div id="cd-kind-note" style="font-size:13px;color:var(--muted);margin-top:6px;line-height:1.5"></div>
   <div class="lbl" id="cd-chart-label"></div>
   <div class="chart-wrap2"><svg id="charge-profile" width="100%" height="100%"></svg></div>
+  <div class="hair"></div>
+  <!-- 충전소 지도 선택 (2026-09-22): 차량이 충전한 자리 기준 후보 → 마커 선택 → 공식 요금표(폰 앱) → 저장(차량에 반영) -->
+  <div class="lbl" id="cs-pick-label"></div>
+  <div id="cs-pick-cur" style="margin-top:6px;font-size:15px;color:var(--sub)"></div>
+  <button class="morebtn" id="cs-pick-btn" style="display:block" onclick="csPickStart()">지도에서 충전소 선택</button>
+  <!-- 내 충전기 등록 (2026-09-24): 이 자리를 집/회사로 → 차량이 위치로 기억, 요금은 정액(계량 kWh 기준). 한전 시간대 요금은 차량 화면에서 -->
+  <div class="kindbtns" id="cs-kind-btns">
+    <button class="morebtn" style="display:block" onclick="csKindStart('home')">이 자리를 집으로</button>
+    <button class="morebtn" style="display:block" onclick="csKindStart('work')">이 자리를 회사로</button>
+  </div>
+  <div id="cs-kind-row" style="display:none">
+    <div id="cs-kind-title" style="font-size:15px;font-weight:500;margin-top:14px"></div>
+    <div style="font-size:13px;color:var(--muted);margin-top:4px;line-height:1.5">완속은 계량기 기준(배터리 kWh ÷ 0.88)으로 요금을 계산합니다. 한전 시간대 요금은 차량 화면의 같은 버튼에서 고를 수 있어요.</div>
+    <div class="editrow"><span style="align-self:center;color:var(--sub);font-size:15px">정액 단가 (원/kWh)</span><input id="cs-kind-rate" type="number" inputmode="decimal" step="0.1" placeholder="예: 120"></div>
+    <div style="display:flex;gap:10px">
+      <button class="morebtn accent" style="display:block" onclick="csKindSave()">저장</button>
+      <button class="morebtn" style="display:block" onclick="csKindCancel()">취소</button>
+    </div>
+    <div id="cs-kind-msg" style="font-size:13px;color:var(--muted);margin-top:8px;min-height:18px"></div>
+  </div>
+  <div id="cs-pick-note" style="font-size:13px;color:var(--muted);margin-top:8px;min-height:18px;line-height:1.5"></div>
+  <div id="cs-map" style="display:none"></div>
+  <div id="cs-list" style="display:none"></div>
+  <div id="cs-panel" style="display:none">
+    <div class="lbl" id="cs-panel-label"></div>
+    <div id="cs-pk-name" style="font-size:19px;font-weight:500;margin-top:6px"></div>
+    <div id="cs-pk-sub" style="font-size:13.5px;color:var(--sub);margin-top:3px"></div>
+    <div class="hair"></div>
+    <div class="lbl" id="cs-pk-fee-label"></div>
+    <div style="display:flex;align-items:baseline;gap:8px;margin-top:2px">
+      <input id="cs-pk-rate" class="pk-rate" type="number" inputmode="decimal" step="0.1"><span style="color:var(--muted);font-size:15px">원/kWh</span>
+    </div>
+    <div id="cs-pk-bands" style="font-size:12.5px;color:var(--muted);margin-top:4px"></div>
+    <div id="cs-pk-note" style="font-size:13.5px;color:var(--sub);margin-top:8px;min-height:18px;line-height:1.5"></div>
+    <button class="morebtn accent" style="display:block" onclick="csPickSave()">이 단가로 저장 — 차량에도 반영</button>
+    <div style="display:flex;gap:10px">
+      <button class="morebtn" style="display:block" onclick="csOpenFeeWeb()">요금표 웹</button>
+      <button class="morebtn" style="display:block" onclick="csPickClose()">닫기</button>
+    </div>
+  </div>
+  <div class="hair"></div>
+  <div class="lbl" id="cd-edit-label"></div>
+  <div class="editrow">
+    <input id="cd-edit-name" placeholder="충전소 이름 (예: 집 완속, 회사 완속)">
+    <input id="cd-edit-rate" type="number" inputmode="decimal" step="0.1" placeholder="원/kWh">
+  </div>
+  <button class="morebtn" style="display:block" onclick="saveChargeEdit()">저장 — 차량에도 반영</button>
+  <div id="cd-edit-msg"></div>
 </div></div>
 
 <div id="tooltip"></div>
@@ -324,6 +430,8 @@ const IC = {
   speedAvg: ["M4,17.5 A9,9 0 1,1 20,17.5","M12,17.5 L12,9.5","F:M12,17.5 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0"],
   speedMax: ["M4,17.5 A9,9 0 1,1 20,17.5","M12,17.5 L18.2,12.2","F:M12,17.5 m-1.7,0 a1.7,1.7 0 1,0 3.4,0 a1.7,1.7 0 1,0 -3.4,0"],
   won: ["M12,12 m-9,0 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0","M7.2,8 L9.2,16 L12,9.5 L14.8,16 L16.8,8","M6.8,11.4 H17.2 M7.4,13.6 H16.6"],
+  home: ["M3.5,11.5 L12,4 L20.5,11.5","M6,9.6 V20 H18 V9.6","M10,20 V14.5 H14 V20"],
+  work: ["M3.5,20.5 H20.5","M6,20.5 V4.5 H14 V20.5","M14,10 H18.5 V20.5","M8.6,8 H11.4 M8.6,11.5 H11.4 M8.6,15 H11.4"],
   station: ["M12,21.5 C12,21.5 5,14.8 5,9.8 A7,7 0 0,1 19,9.8 C19,14.8 12,21.5 12,21.5 Z","M12.8,5.6 L9.6,10.4 L12.2,10.4 L11.4,14.2 L14.6,9.4 L12,9.4 Z"],
   parking: ["M12,21.5 C12,21.5 5,14.8 5,9.8 A7,7 0 0,1 19,9.8 C19,14.8 12,21.5 12,21.5 Z","M10.2,13.6 V6.4 H12.9 A2.1,2.1 0 0,1 12.9,10.6 H10.2"],
   compare: ["M3.5,20.5 H20.5","M6.5,20.5 V13 H10.5 V20.5","M13.5,20.5 V8 H17.5 V20.5","M15.5,2.8 V5.6 M13.4,4.6 L15.5,2.5 L17.6,4.6"],
@@ -368,15 +476,24 @@ function connect() {
   const key = document.getElementById("in-key").value.trim();
   const dev = document.getElementById("in-dev").value.trim();
   const vw = document.getElementById("in-vw").value.trim();
+  const dg = document.getElementById("in-dg").value.trim();
   if (!url || !key || !dev) { document.getElementById("err").textContent = "URL · 키 · 차량 ID를 입력하세요"; return; }
-  location.hash = encodeURIComponent(JSON.stringify({u:url,k:key,d:dev,v:vw}));
-  init(url, key, dev, vw);
+  const cfg = {u:url,k:key,d:dev,v:vw,g:dg};
+  location.hash = encodeURIComponent(JSON.stringify(cfg));
+  try { localStorage.setItem("plog_cfg", JSON.stringify(cfg)); } catch (e) {}   // 폰 앱은 해시 없이 다시 열리므로 여기서 기억 (2026-09-25)
+  init(url, key, dev, vw, dg);
 }
-async function init(url, key, dev, vw) {
+function loadStoredCfg() { try { return JSON.parse(localStorage.getItem("plog_cfg") || "null"); } catch (e) { return null; } }
+/* 연결 해제("로그아웃"): 저장한 연결 정보를 지우고 설정 화면으로 (2026-09-25, 사용자 요청) */
+function disconnect() {
+  try { localStorage.removeItem("plog_cfg"); } catch (e) {}
+  location.hash = "#setup"; location.reload();
+}
+async function init(url, key, dev, vw, dg) {
   sb = window.supabase.createClient(url, key);
-  DEV = dev; BASEURL = url; VWORLD_KEY = vw || "";
+  DEV = dev; BASEURL = url; VWORLD_KEY = vw || ""; DATA_GO_KEY = dg || "";
   const test = await sb.from("trip").select("client_id").limit(1);
-  if (test.error) { document.getElementById("err").textContent = "연결 실패: " + test.error.message; return; }
+  if (test.error) { document.getElementById("err").textContent = "연결 실패: " + test.error.message; return false; }
   document.getElementById("setup").style.display = "none";
   document.getElementById("app").style.display = "block";
   document.getElementById("hd-dev").textContent = dev;
@@ -387,17 +504,22 @@ async function init(url, key, dev, vw) {
   setLbl("ps-lbl", "car", "차량 상태 · 폴스타 계정");
   setLbl("park-lbl", "parking", "주차 위치");
   setLbl("cons-lbl", "log", "소모품");
+  setLbl("usage-lbl", "battery", "서버 사용량 · 무료 한도");
   setLbl("td-hero-label", "dist", "거리"); setLbl("td-chart-label", "eff", "전비 비교 · 최근 주행 vs 이번 주행");
-  setLbl("cd-hero-label", "energy", "충전량"); setLbl("cd-chart-label", "speed", "충전 속도 곡선");
+  setLbl("cd-hero-label", "energy", "충전량"); setLbl("cd-chart-label", "speed", "충전 타임라인 · 진할수록 빠르게");
+  setLbl("cd-edit-label", "won", "단가·충전소 직접 입력");
+  setLbl("cs-pick-label", "station", "충전소 · 지도에서 선택"); setLbl("cs-panel-label", "station", "선택한 충전소");
   document.getElementById("nav-drive").innerHTML = ic("dist", 20) + "주행";
   document.getElementById("nav-charge").innerHTML = ic("energy", 20) + "충전";
   document.getElementById("nav-car").innerHTML = ic("car", 20) + "차량";
   await Promise.all([loadTrips(), loadCharges()]);
   renderHero();
+  setPtabs("t-ptabs", T_PERIODS.indexOf(tPeriod)); setPtabs("c-ptabs", C_PERIODS.indexOf(cPeriod));   // 기억한 기간 탭 강조
   tRender(); cRender();
   loadCharts();
-  loadParking(); loadConsumables();
+  loadParking(); loadConsumables(); loadUsage();
   psInit();   // 폰 앱에서만 동작 (네이티브 브리지가 있을 때)
+  return true;
 }
 
 /* ---------- 탭 ---------- */
@@ -455,10 +577,10 @@ function setPtabs(boxId, idx) {
   [...box.children].forEach((el, i) => el.classList.toggle("on", i === idx));
 }
 const tripEff = r => (r.energy_kwh && r.energy_kwh > 0.05) ? (r.distance_m/1000)/r.energy_kwh : null;
-const usualEff = () => {   // 최근 30일 평소 전비 (차량 앱 규칙)
+const usualEff = () => {   // 최근 30일 평소 전비 (차량 앱 규칙: 0.3 kWh 미만 주행 제외, 2026-09-21)
   const from = Date.now() - 30*86400000;
   let km = 0, kwh = 0;
-  for (const r of allTrips) if (r.start_ts >= from && r.energy_kwh) { km += r.distance_m/1000; kwh += r.energy_kwh; }
+  for (const r of allTrips) if (r.start_ts >= from && r.energy_kwh >= 0.3) { km += r.distance_m/1000; kwh += r.energy_kwh; }
   return kwh > 0.5 && km > 0.5 ? km/kwh : null;
 };
 
@@ -527,14 +649,29 @@ function renderHero() {
 }
 
 /* ---------- 주행 탭: 기간 요약 + 목록 ---------- */
+/* 기간 탭 기억 (2026-09-25, 사용자: "항상 월간으로 떠서 불편") — localStorage, 없으면 월간 */
+const remember = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const recall = (k, ok, dflt) => { try { const v = localStorage.getItem(k); return ok.includes(v) ? v : dflt; } catch (e) { return dflt; } };
 const T_PERIODS = ["day","week","month","year","all"];
-let tPeriod = "month", tCur = new Date(), tRows = [], tAll = false;
+let tPeriod = recall("plog_tperiod", T_PERIODS, "month"), tCur = new Date(), tRows = [], tPage = 1;
 document.getElementById("t-ptabs").addEventListener("click", e => {
   const i = [...e.currentTarget.children].indexOf(e.target); if (i < 0) return;
-  tPeriod = T_PERIODS[i]; tAll = false; setPtabs("t-ptabs", i); tRender(true);
+  tPeriod = T_PERIODS[i]; tPage = 1; setPtabs("t-ptabs", i); remember("plog_tperiod", tPeriod); tRender(true);
 });
-function tMove(d) { periodMove(tPeriod, tCur, d); tAll = false; tRender(true); }
-function tShowAll() { tAll = true; tRender(); }
+function tMove(d) { periodMove(tPeriod, tCur, d); tPage = 1; tRender(true); }
+function tGo(p) { tPage = p; tRender(); document.getElementById("t-list").scrollIntoView({ block: "start", behavior: "smooth" }); }
+/* 쪽수: 한 번에 PAGE_ROWS 건, 현재 쪽 주변 5개 번호 + ‹ › + 전체 건수. 기록이 수백 건 쌓여도 그리는 양은 일정 */
+const PAGE_ROWS = 8;
+function pageSlice(rows, page) { const pages = Math.max(1, Math.ceil(rows.length / PAGE_ROWS)); page = Math.min(Math.max(1, page), pages); return { page, pages, show: rows.slice((page - 1) * PAGE_ROWS, page * PAGE_ROWS) }; }
+function renderPager(id, page, pages, total, fn) {
+  const el = document.getElementById(id);
+  if (pages <= 1) { el.classList.remove("on"); el.innerHTML = ""; return; }
+  const start = Math.max(1, Math.min(page - 2, pages - 4)), end = Math.min(pages, start + 4);
+  let h = `<span class="nav${page <= 1 ? " dim" : ""}" onclick="${fn}(${page - 1})">‹</span>`;
+  for (let p = start; p <= end; p++) h += `<span class="${p === page ? "on" : ""}" onclick="${fn}(${p})">${p}</span>`;
+  h += `<span class="nav${page >= pages ? " dim" : ""}" onclick="${fn}(${page + 1})">›</span><span class="cnt">${total}건</span>`;
+  el.innerHTML = h; el.classList.add("on");
+}
 function tripRowHtml(r) {
   const eff = tripEff(r);
   const place = (r.start_place || r.end_place) ? `${r.start_place||"?"} → ${r.end_place||"?"}` : fmtDur(r.end_ts-r.start_ts) + (r.avg_kmh ? ` · 평균 ${Math.round(r.avg_kmh)} km/h` : "");
@@ -566,31 +703,31 @@ function tRender(animate) {
   const box = document.getElementById("t-sum");
   box.innerHTML = cells.map(c => `<div class="cell"><div class="lbl">${ic(c[0])}<span>${c[1]}</span></div><div class="val${c[0]==="regen"?" green":c[0]==="eff"?" accent":""}" id="${c[2]}"></div></div>`).join("");
   for (const c of cells) tween(c[2], c[3], c[4]);
-  const list = document.getElementById("t-list"), more = document.getElementById("t-more");
+  const list = document.getElementById("t-list");
   if (!tRows.length) {
     list.innerHTML = `<div class="empty">${ic("log", 30)}<span>이 기간엔 주행 기록이 없습니다<br>주행이 끝나면 차량이 자동으로 올립니다</span></div>`;
-    more.style.display = "none";
+    renderPager("t-pager", 1, 1, 0, "tGo");
   } else {
-    const show = tAll ? tRows : tRows.slice(0, 8);
-    list.innerHTML = show.map(tripRowHtml).join("");
-    more.style.display = tRows.length > show.length ? "block" : "none";
-    more.textContent = `나머지 ${tRows.length - show.length}건 더 보기`;
+    const pg = pageSlice(tRows, tPage); tPage = pg.page;
+    list.innerHTML = pg.show.map(tripRowHtml).join("");
+    renderPager("t-pager", pg.page, pg.pages, tRows.length, "tGo");
   }
   if (animate) { for (const id of ["t-sum","t-list"]) { const el = document.getElementById(id); el.style.animation = "none"; void el.offsetWidth; el.style.animation = "rise .24s ease-out"; } }
 }
 
 /* ---------- 충전 탭 ---------- */
 const C_PERIODS = ["week","month","year","all"];
-let cPeriod = "month", cCur = new Date(), cRows = [], cAll = false;
+let cPeriod = recall("plog_cperiod", C_PERIODS, "month"), cCur = new Date(), cRows = [], cPage = 1;
 document.getElementById("c-ptabs").addEventListener("click", e => {
   const i = [...e.currentTarget.children].indexOf(e.target); if (i < 0) return;
-  cPeriod = C_PERIODS[i]; cAll = false; setPtabs("c-ptabs", i); cRender(true);
+  cPeriod = C_PERIODS[i]; cPage = 1; setPtabs("c-ptabs", i); remember("plog_cperiod", cPeriod); cRender(true);
 });
-function cMove(d) { periodMove(cPeriod, cCur, d); cAll = false; cRender(true); }
-function cShowAll() { cAll = true; cRender(); }
+function cMove(d) { periodMove(cPeriod, cCur, d); cPage = 1; cRender(true); }
+function cGo(p) { cPage = p; cRender(); document.getElementById("c-list").scrollIntoView({ block: "start", behavior: "smooth" }); }
 function chargeRowHtml(r) {
   const parts = [r.type === "DC" ? "급속" : "완속"];
-  if (r.station) parts.push(r.station);
+  if (r.place) parts.push(r.place);   // 충전 위치 동네 이름 (서버 v9, 2026-09-25 — 주행 목록처럼)
+  if (r.kind) parts.push(kindLabel(r.kind)); else if (r.station) parts.push(r.station);
   if (r.soc_start != null && r.soc_end != null) parts.push(`${Math.round(r.soc_start)} → ${Math.round(r.soc_end)}%`);
   parts.push(fmtDur(r.end_ts - r.start_ts)); parts.push(`최대 ${r.max_kw} kW`);
   return `<div class="row" onclick="openChargeDetail(${r.client_id})">
@@ -617,15 +754,19 @@ function cRender(animate) {
   document.getElementById("c-split-ac").style.flex = Math.max(0.02, 1-dcW);
   document.getElementById("c-split-a").textContent = n ? `급속 ${fmtKwh(dcKwh)} · ${Math.round(dcW*100)}%` : "급속";
   document.getElementById("c-split-b").textContent = n ? `완속 ${fmtKwh(kwh-dcKwh)} · ${Math.round((1-dcW)*100)}%` : "완속";
-  const list = document.getElementById("c-list"), more = document.getElementById("c-more");
+  const homeKwh = cRows.filter(x=>x.kind).reduce((s,x)=>s+x.kwh,0), hW = kwh > 0.01 ? homeKwh/kwh : 0.5;
+  document.getElementById("c-split-home").style.flex = Math.max(0.02, hW);
+  document.getElementById("c-split-out").style.flex = Math.max(0.02, 1-hW);
+  document.getElementById("c-split-h").textContent = n ? `집·회사 ${fmtKwh(homeKwh)} · ${Math.round(hW*100)}%` : "집·회사";
+  document.getElementById("c-split-o").textContent = n ? `외부 ${fmtKwh(kwh-homeKwh)} · ${Math.round((1-hW)*100)}%` : "외부";
+  const list = document.getElementById("c-list");
   if (!n) {
     list.innerHTML = `<div class="empty">${ic("energy", 30)}<span>이 기간엔 충전 기록이 없습니다<br>충전이 끝나면 차량이 자동으로 올립니다</span></div>`;
-    more.style.display = "none";
+    renderPager("c-pager", 1, 1, 0, "cGo");
   } else {
-    const show = cAll ? cRows : cRows.slice(0, 8);
-    list.innerHTML = show.map(chargeRowHtml).join("");
-    more.style.display = cRows.length > show.length ? "block" : "none";
-    more.textContent = `나머지 ${cRows.length - show.length}건 더 보기`;
+    const pg = pageSlice(cRows, cPage); cPage = pg.page;
+    list.innerHTML = pg.show.map(chargeRowHtml).join("");
+    renderPager("c-pager", pg.page, pg.pages, cRows.length, "cGo");
   }
   if (animate) { for (const id of ["c-list"]) { const el = document.getElementById(id); el.style.animation = "none"; void el.offsetWidth; el.style.animation = "rise .24s ease-out"; } }
 }
@@ -714,6 +855,177 @@ function vworldLayer() {
     { minZoom: 6, maxZoom: 19, attribution: "&copy; VWorld" });
 }
 
+/* ---------- 충전소 지도 선택 (2026-09-22, 사용자: "폰도 차량 앱처럼 충전 위치 기준 지도에서 고르게") ----------
+   차량 앱 EvStations·ChargeDetailScreen 과 같은 규칙: 시도 상자 → zcode → 충전기 목록을 충전소(statNm) 단위로 묶고 반경 800m 12곳,
+   번호 마커를 누르면 패널(이름·사업자·정격·거리 / 공식 요금표 큰 숫자 / 5구간 / 저장). 요금표는 폰 앱(StationBridge)에서만 자동, 브라우저는 로밍 제안.
+   시도 목록은 크므로(광주 4페이지·서울 8페이지) 충전소 단위로 묶어 localStorage 에 7일 캐시. data.go.kr 은 CORS 허용(2026-09-22 확인) */
+let DATA_GO_KEY = "";
+const ST_BOXES = [   // 시도 경계 상자 (차량 앱 EvStations.BOXES 와 동일 — 광역시 먼저)
+  ["26",34.95,35.40,128.75,129.35], ["31",35.35,35.75,129.00,129.50], ["27",35.60,36.05,128.35,128.80],
+  ["12",35.05,35.25,126.70,127.05], ["30",36.15,36.50,127.25,127.60], ["36",36.40,36.75,127.15,127.40],
+  ["11",37.42,37.72,126.75,127.20], ["28",37.20,37.80,126.20,126.80], ["41",36.85,38.30,126.35,127.90],
+  ["51",37.00,38.65,127.05,129.40], ["43",36.00,37.25,127.25,128.65], ["44",35.95,37.10,125.95,127.40],
+  ["52",35.30,36.20,126.35,127.90], ["12",33.90,35.50,125.05,127.55], ["47",35.55,37.15,127.80,129.60],
+  ["48",34.55,35.95,127.55,129.30], ["50",33.10,33.60,126.10,127.05]];
+function stZcode(lat, lon) { const b = ST_BOXES.find(b => lat >= b[1] && lat <= b[2] && lon >= b[3] && lon <= b[4]); return b ? b[0] : null; }
+function csDistM(a1, o1, a2, o2) {   // 이름 충돌 주의: 아래쪽에 배열 인자용 distM(a,b)가 따로 있다
+  const R = 6371000, d = Math.PI / 180; const dl = (a2 - a1) * d, dn = (o2 - o1) * d;
+  const s = Math.sin(dl / 2) ** 2 + Math.cos(a1 * d) * Math.cos(a2 * d) * Math.sin(dn / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(s)); }
+async function stLoadZone(zcode, onProgress) {
+  const ck = "plog_st_" + zcode;
+  try { const c = JSON.parse(localStorage.getItem(ck) || "null"); if (c && Date.now() - c.ts < 7 * 86400000 && c.list.length) return c.list; } catch (e) {}
+  const agg = new Map(); let total = Infinity, page = 1; const ROWS = 9999;
+  while (page <= 8 && (page - 1) * ROWS < total) {
+    onProgress(`충전소 목록 내려받는 중… ${page}페이지 (처음 한 번만, 이후 7일 캐시)`);
+    const r = await fetch(`https://apis.data.go.kr/B552584/EvCharger/getChargerInfo?serviceKey=${DATA_GO_KEY}&pageNo=${page}&numOfRows=${ROWS}&zcode=${zcode}&dataType=JSON`);
+    if (!r.ok) throw new Error("API " + r.status);
+    const j = await r.json();
+    if (j.OpenAPI_ServiceResponse) throw new Error((j.OpenAPI_ServiceResponse.cmmMsgHeader || {}).returnAuthMsg || "API 키 오류");
+    total = +j.totalCount || 0;
+    const items = (j.items && j.items.item) || [];
+    for (const it of items) {
+      const la = +it.lat, lo = +it.lng; if (!it.statNm || !la || !lo) continue;
+      let a = agg.get(it.statNm); if (!a) { a = { n: it.statNm, la, lo, op: it.busiNm || null, o: [] }; agg.set(it.statNm, a); }
+      const kw = Math.round(+it.output); if (kw > 0 && !a.o.includes(kw)) a.o.push(kw);
+    }
+    if (items.length < ROWS) break;
+    page++;
+  }
+  const list = [...agg.values()].map(a => { a.o.sort((x, y) => x - y); return a; });
+  try { localStorage.setItem(ck, JSON.stringify({ ts: Date.now(), list })); } catch (e) {}
+  return list;
+}
+let csMap = null, csCands = [], csPicked = null, csFeeCb = 0;
+const CS_BANDS = ["완속(30kW 미만)", "중속(30~49kW)", "급속(50~99kW)", "급속(100~199kW)", "초급속(200kW 이상)"], CS_BAND_SHORT = ["완속", "중속", "급속 50", "급속 100", "초급속"];
+function csRoamingRate(kw) { return kw < 30 ? 295.0 : kw < 50 ? 307.2 : kw < 100 ? 325.6 : kw < 200 ? 348.4 : 393.1; }   // 환경부 로밍 단가 (차량 앱과 동일)
+function csRatedKw(outputs, maxKw) { const c = (outputs || []).filter(x => x > 0).sort((a, b) => a - b); if (!c.length) return maxKw; const need = maxKw * 0.93; return c.find(x => x >= need) ?? c[c.length - 1]; }
+function csBandIdx(kw) { return kw < 30 ? 0 : kw < 50 ? 1 : kw < 100 ? 2 : kw < 200 ? 3 : 4; }
+/* 내 충전기 (집·회사, 2026-09-24) — 차량 앱 HomeTariff 와 같은 규칙: 완속은 계량 kWh = 배터리 kWh ÷ 0.88 */
+const AC_METER_EFF = 0.88;
+const meterKwh = r => (r.kind && r.type === "AC") ? r.kwh / AC_METER_EFF : r.kwh;
+const kindLabel = k => k === "home" ? "집" : k === "work" ? "회사" : "";
+const kindLabelRo = k => k === "home" ? "집으로" : k === "work" ? "회사로" : "";   // 받침에 따른 조사
+let csKind = null;
+function csKindStart(kind) {
+  const r = allCharges.find(x => x.client_id === editingChargeId); if (!r) return;
+  if (r.st_lat == null || r.st_lon == null) { document.getElementById("cs-pick-note").textContent = "이 충전 기록엔 위치가 없어 " + kindLabelRo(kind) + " 지정할 수 없어요 (차량 앱 업데이트 뒤 충전부터)"; return; }
+  csKind = kind;
+  document.getElementById("cs-kind-title").textContent = "이 자리를 " + kindLabelRo(kind) + " — 이 위치(150 m)에서 한 충전은 앞으로 " + kindLabelRo(kind) + " 자동 인식";
+  document.getElementById("cs-kind-rate").value = r.kind === kind && meterKwh(r) > 0.01 ? (r.cost / meterKwh(r)).toFixed(1) : "";
+  document.getElementById("cs-kind-msg").textContent = "";
+  document.getElementById("cs-kind-row").style.display = "block";
+  document.getElementById("cs-kind-btns").style.display = "none";
+}
+function csKindCancel() { csKind = null; document.getElementById("cs-kind-row").style.display = "none"; document.getElementById("cs-kind-btns").style.display = "flex"; }
+async function csKindSave() {
+  const r = allCharges.find(x => x.client_id === editingChargeId), kind = csKind; if (!r || !kind) return;
+  const msg = document.getElementById("cs-kind-msg");
+  const rate = parseFloat(document.getElementById("cs-kind-rate").value);
+  if (!(rate >= 0)) { msg.textContent = "정액 단가를 숫자로 입력하세요 (모르면 0)"; return; }
+  const mk = (r.type === "AC") ? r.kwh / AC_METER_EFF : r.kwh;
+  const cost = Math.round(mk * rate);
+  msg.textContent = "저장 중…";
+  const res = await sb.from("charge").update({ cost, station: kindLabel(kind), kind, edited_ts: Date.now() }).eq("device_id", DEV).eq("client_id", r.client_id);
+  if (res.error) { msg.textContent = /kind/.test(res.error.message) ? "서버에 kind 컬럼이 없습니다 — supabase_setup.sql v8의 alter 한 줄을 실행하세요" : "저장 실패: " + res.error.message; return; }
+  r.cost = cost; r.station = kindLabel(kind); r.kind = kind;
+  csKind = null;
+  openChargeDetail(r.client_id); cRender();
+  document.getElementById("cs-pick-note").textContent = "저장됨 · 차량은 다음 동기화 때 이 자리를 " + kindLabelRo(kind) + " 기억합니다 (다음부터 자동 인식)";
+}
+function csSetupSection(r) {
+  csPickClose(true);
+  csKindCancel();
+  const cur = document.getElementById("cs-pick-cur"), btn = document.getElementById("cs-pick-btn"), note = document.getElementById("cs-pick-note");
+  cur.textContent = (r.kind ? kindLabel(r.kind) : (r.station || "충전소 미확인")) + "  ·  " + (meterKwh(r) > 0.01 ? (r.cost / meterKwh(r)).toFixed(1) + "원/kWh" : "-");
+  const hasLoc = r.st_lat != null && r.st_lon != null;
+  btn.style.display = hasLoc ? "block" : "none";
+  note.textContent = !hasLoc ? "이 충전 기록엔 위치가 없어요 — 차량 앱 업데이트(서버 v7) 뒤에 올라온 충전부터 지도에서 고를 수 있어요"
+    : !DATA_GO_KEY ? "충전소 정보 API 키가 없어요 — 첫 화면(주소 뒤에 #setup)에서 data.go.kr 키를 넣으세요" : "";
+}
+async function csPickStart() {
+  const r = allCharges.find(x => x.client_id === editingChargeId); if (!r) return;
+  const note = document.getElementById("cs-pick-note"), btn = document.getElementById("cs-pick-btn");
+  if (!DATA_GO_KEY) { csSetupSection(r); return; }
+  const zcode = stZcode(r.st_lat, r.st_lon);
+  if (!zcode) { note.textContent = "충전 위치가 시도 상자 밖이라 찾을 수 없어요"; return; }
+  btn.disabled = true; btn.textContent = "근처 충전소를 찾는 중…";
+  let list;
+  try { list = await stLoadZone(zcode, t => note.textContent = t); }
+  catch (e) { note.textContent = "충전소 목록을 못 받았어요: " + e.message; btn.disabled = false; btn.textContent = "지도에서 충전소 선택"; return; }
+  csCands = list.map(a => ({ ...a, d: csDistM(r.st_lat, r.st_lon, a.la, a.lo) })).filter(a => a.d <= 800).sort((a, b) => a.d - b.d).slice(0, 12);
+  btn.disabled = false; btn.textContent = "선택 취소"; btn.onclick = () => csPickClose();
+  if (!csCands.length) { note.textContent = "반경 800m 안에 충전소가 없어요 (아파트·사내 충전기는 공공 목록에 없을 수 있어요 — 아래 직접 입력)"; return; }
+  note.textContent = `지도에서 충전소를 누르세요 (${csCands.length}곳)`;
+  document.getElementById("cs-map").style.display = "block";
+  setTimeout(() => {
+    if (csMap) { csMap.remove(); csMap = null; }
+    csMap = L.map("cs-map", { zoomControl: false }); vworldLayer().addTo(csMap);
+    L.circleMarker([r.st_lat, r.st_lon], { radius: 7, color: "#FF7500", fillColor: "#FF7500", fillOpacity: 1 }).addTo(csMap);
+    const b = [[r.st_lat, r.st_lon]];
+    csCands.forEach((c, i) => {
+      const icon = L.divIcon({ className: "", iconSize: [30, 30], iconAnchor: [15, 15],
+        html: `<div style="width:30px;height:30px;border-radius:15px;background:#FF7500;color:#000;font:700 15px sans-serif;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px rgba(0,0,0,.6)">${i + 1}</div>` });
+      L.marker([c.la, c.lo], { icon }).addTo(csMap).bindTooltip(c.n, { direction: "top", offset: [0, -18], opacity: 1, className: "p4" }).on("click", () => csPick(i));
+      b.push([c.la, c.lo]);
+    });
+    csMap.invalidateSize();
+    csMap.fitBounds(L.latLngBounds(b), { padding: [40, 40], maxZoom: 17 });
+  }, 60);
+  // 폰 화면은 좁아 이름표 12개가 겹친다 → 지도엔 번호만, 이름·거리는 아래 목록 (둘 다 눌러서 선택)
+  const lst = document.getElementById("cs-list");
+  lst.innerHTML = csCands.map((c, i) => `<div class="cs-row" onclick="csPick(${i})"><span class="no">${i + 1}</span><span class="nm">${c.n.replace(/</g, "&lt;")}</span><span class="ds">${Math.round(c.d)} m${c.o.length ? " · " + c.o[c.o.length - 1] + " kW" : ""}</span></div>`).join("");
+  lst.style.display = "block";
+}
+function csPick(i) {
+  const r = allCharges.find(x => x.client_id === editingChargeId), c = csCands[i]; if (!r || !c) return;
+  csPicked = c;
+  document.getElementById("cs-map").style.display = "none"; document.getElementById("cs-list").style.display = "none"; if (csMap) { csMap.remove(); csMap = null; }
+  document.getElementById("cs-pick-btn").style.display = "none"; document.getElementById("cs-pick-note").textContent = "";
+  const ratedKw = csRatedKw(c.o, r.max_kw || 0), band = csBandIdx(ratedKw), suggested = csRoamingRate(ratedKw);
+  c.band = band; c.suggested = suggested;
+  document.getElementById("cs-pk-name").textContent = c.n;
+  document.getElementById("cs-pk-sub").textContent = [c.op, ratedKw > 0 ? `정격 ${Math.round(ratedKw)} kW` : null, `충전 위치에서 ${Math.round(c.d)} m`].filter(Boolean).join("  ·  ");
+  setLbl("cs-pk-fee-label", "won", "공식 요금표 · " + CS_BANDS[band]);
+  const inp = document.getElementById("cs-pk-rate"); inp.value = suggested.toFixed(1); inp.style.color = "var(--muted)";
+  document.getElementById("cs-pk-bands").textContent = "";
+  const note = document.getElementById("cs-pk-note");
+  document.getElementById("cs-panel").style.display = "block";
+  if (typeof StationBridge !== "undefined") {
+    note.style.color = "var(--sub)"; note.textContent = `무공해차 통합누리집 요금표에서 "${c.n}" 검색 중…  (로밍 단가 ${Math.round(suggested)}원 제안 상태)`;
+    StationBridge.lookupFee(c.n, band, ++csFeeCb);
+  } else {
+    note.style.color = "#FFB020"; note.textContent = `요금표 자동 조회는 폰 앱에서만 돼요 — 로밍 단가 ${Math.round(suggested)}원을 제안합니다. 숫자를 고치거나 [요금표 웹]에서 확인하세요`;
+  }
+}
+window.onFeeResult = function (id, r) {
+  if (id !== csFeeCb || !csPicked) return;
+  const inp = document.getElementById("cs-pk-rate"), note = document.getElementById("cs-pk-note"), bands = document.getElementById("cs-pk-bands");
+  if (r.prices) bands.textContent = r.prices.map((v, i) => v > 0 ? `${CS_BAND_SHORT[i]} ${Math.round(v)}` : null).filter(Boolean).join("  ·  ");
+  inp.style.color = "var(--accent)";
+  if (r.rate > 0) { inp.value = (+r.rate).toFixed(1); note.style.color = "var(--green)"; note.textContent = `공식 요금표에서 찾음  ·  ${r.cpo || ""}  ·  회원가 기준, 확인 후 저장`; }
+  else { note.style.color = "#FFB020"; note.textContent = `공식 요금표에 없음 — 로밍 단가 ${Math.round(csPicked.suggested)}원을 제안합니다. 숫자를 직접 고치거나 [요금표 웹]에서 확인하세요`; }
+};
+function csOpenFeeWeb() { const u = "https://ev.or.kr/nportal/evcarInfo/initEvcarChargePriceV2.do"; if (typeof StationBridge !== "undefined") StationBridge.openUrl(u); else window.open(u, "_blank"); }
+function csPickClose(silent) {
+  csFeeCb++; csPicked = null; csCands = [];
+  if (csMap) { csMap.remove(); csMap = null; }
+  document.getElementById("cs-map").style.display = "none"; document.getElementById("cs-list").style.display = "none"; document.getElementById("cs-panel").style.display = "none";
+  const btn = document.getElementById("cs-pick-btn"); btn.disabled = false; btn.textContent = "지도에서 충전소 선택"; btn.onclick = csPickStart;
+  if (!silent) { const r = allCharges.find(x => x.client_id === editingChargeId); if (r) csSetupSection(r); }
+}
+async function csPickSave() {
+  const r = allCharges.find(x => x.client_id === editingChargeId), c = csPicked; if (!r || !c) return;
+  const rate = parseFloat(document.getElementById("cs-pk-rate").value), note = document.getElementById("cs-pk-note");
+  if (!(rate > 0)) { note.style.color = "#FFB020"; note.textContent = "단가를 숫자로 입력하세요"; return; }
+  const cost = Math.round(r.kwh * rate);
+  note.style.color = "var(--sub)"; note.textContent = "저장 중…";
+  const res = await sb.from("charge").update({ cost, station: c.n, edited_ts: Date.now() }).eq("device_id", DEV).eq("client_id", r.client_id);
+  if (res.error) { note.style.color = "#FFB020"; note.textContent = "저장 실패: " + res.error.message; return; }
+  r.cost = cost; r.station = c.n;
+  openChargeDetail(r.client_id); cRender();
+  document.getElementById("cs-pick-note").textContent = "저장됨 · 차량은 다음 동기화 때 이 충전소·단가를 기억합니다 (다음부터 자동 인식)";
+}
+
 /* ---------- 폴스타 계정 (폰 앱에서만) ---------- */
 function psAvailable() { return typeof PolestarBridge !== "undefined"; }
 function psInit() {
@@ -799,6 +1111,28 @@ async function loadParking() {
     // 촬영 결과는 주행 저장 직후 동기화보다 늦게 끝나므로(2026-09-13 확인) 차량이 다음에 켜질 때 올라오는 경우가 흔하다
     note.textContent = "주차 사진이 아직 안 올라왔습니다 — 차량이 다음에 켜져 동기화되면 표시됩니다";
   }
+}
+
+/* ---------- 서버 사용량 (2026-09-21): DB는 서버 함수 plog_usage(SQL v6), 저장소는 parking 버킷 파일 합. 무료 한도 DB 500MB / 저장소 1GB ---------- */
+async function loadUsage() {
+  const mb = b => (b/1048576).toFixed(1) + " MB";
+  const DB_LIMIT = 500*1048576, ST_LIMIT = 1024*1048576;
+  const dbEl = document.getElementById("usage-db"), stEl = document.getElementById("usage-st"), note = document.getElementById("usage-note");
+  const r = await sb.rpc("plog_usage");
+  if (r.error) {
+    dbEl.textContent = /plog_usage/.test(r.error.message) || r.error.code === "PGRST202" ? "서버 함수 없음 — supabase_setup.sql v6 실행" : "조회 실패";
+  } else {
+    const u = r.data; const pct = u.db_bytes/DB_LIMIT*100;
+    dbEl.textContent = `${mb(u.db_bytes)} 사용 · ${mb(DB_LIMIT - u.db_bytes)} 남음 (${pct.toFixed(1)}%)`;
+    const bar = document.getElementById("usage-db-bar"); bar.style.width = Math.max(0.5, Math.min(100, pct)) + "%"; bar.style.background = pct >= 85 ? "#FF7500" : "#F2F2F2";
+    note.textContent = `주행 ${u.trips}건 · 충전 ${u.charges}건 저장됨`;
+  }
+  const s = await sb.storage.from("parking").list("", { limit: 1000 });
+  if (s.error || !s.data) { stEl.textContent = "조회 실패"; return; }
+  const bytes = s.data.reduce((a, o) => a + ((o.metadata && o.metadata.size) || 0), 0);
+  const p2 = bytes/ST_LIMIT*100;
+  stEl.textContent = `${mb(bytes)} 사용 · ${mb(ST_LIMIT - bytes)} 남음 (${p2.toFixed(2)}%)`;
+  const b2 = document.getElementById("usage-st-bar"); b2.style.width = Math.max(0.5, Math.min(100, p2)) + "%"; b2.style.background = p2 >= 85 ? "#FF7500" : "#F2F2F2";
 }
 
 /* ---------- 소모품 (차량 탭과 같은 색 단계: 여유 흰색 → 곧 교체 주황 → 교체 필요 빨강) ---------- */
@@ -895,7 +1229,7 @@ const cell = (icon, k, v, cls) => `<div><div class="lbl">${ic(icon)}<span>${k}</
 async function openTripDetail(clientId) {
   const r = allTrips.find(x => x.client_id === clientId);
   if (!r) return;
-  document.getElementById("modal").classList.add("on");
+  sheetOpened("modal");
   document.getElementById("modal-title").textContent = fmtDt(r.start_ts) + " 주행";
   shown["td-hero"] = 0;
   tween("td-hero", r.distance_m/1000, v => big(v.toFixed(1), "km"));
@@ -926,10 +1260,52 @@ async function openTripDetail(clientId) {
     drawEffChart("trip-eff", effs, r.client_id);
   }, 60);
 }
-function closeModal(){ document.getElementById("modal").classList.remove("on"); }
+/* ---------- 시트 닫기: 손잡이 끌어내리기 + 안드로이드 뒤로가기 (2026-09-25, 사용자 요청) ----------
+   열릴 때 history.pushState 를 넣어 두면 폰 앱(WebView)의 뒤로가기가 goBack → popstate → 시트만 닫힌다.
+   X·바깥 탭으로 닫을 땐 우리가 history.back() 을 불러 상태를 맞춘다 (그때 오는 popstate 는 무시). */
+let sheetHist = 0, ignorePop = false;
+function sheetOpened(id) {
+  const el = document.getElementById(id);
+  if (el.classList.contains("on")) return;       // 이미 열려 있으면(저장 뒤 다시 그리기) 다시 넣지 않는다
+  el.classList.add("on");
+  try { history.pushState({ sheet: id }, ""); sheetHist++; } catch (e) {}
+}
+function hideSheet(id) {
+  const el = document.getElementById(id);
+  if (!el.classList.contains("on")) return;
+  el.classList.remove("on");
+  const inner = el.querySelector(".inner"); inner.style.transform = ""; inner.classList.remove("dragging", "settle");
+  if (sheetHist > 0) { sheetHist--; ignorePop = true; try { history.back(); } catch (e) { ignorePop = false; } }
+}
+window.addEventListener("popstate", () => {
+  if (ignorePop) { ignorePop = false; return; }
+  if (sheetHist > 0) {
+    sheetHist--;
+    for (const id of ["modal", "cmodal"]) { const el = document.getElementById(id); el.classList.remove("on");
+      const inner = el.querySelector(".inner"); inner.style.transform = ""; inner.classList.remove("dragging", "settle"); }
+  }
+});
+/* 손잡이(또는 맨 위까지 스크롤된 상태에서 손가락 아래로)를 끌면 시트가 따라오고, 90px 넘게 끌면 닫힌다 */
+function installSheetDrag(id, closeFn) {
+  const el = document.getElementById(id), inner = el.querySelector(".inner"), grip = el.querySelector(".griparea");
+  let startY = null, dy = 0, viaGrip = false;
+  const start = (e, g) => { if (!g && (e.pointerType !== "touch" || inner.scrollTop > 0)) return;
+    startY = e.clientY; dy = 0; viaGrip = g; inner.classList.add("dragging"); inner.classList.remove("settle"); };
+  const move = e => { if (startY == null) return; dy = Math.max(0, e.clientY - startY);
+    if (viaGrip || dy > 0) { inner.style.transform = `translateY(${dy}px)`; if (e.cancelable) e.preventDefault(); } };
+  const end = () => { if (startY == null) return; startY = null; inner.classList.remove("dragging"); inner.classList.add("settle");
+    if (dy > 90) { inner.style.transform = "translateY(100%)"; setTimeout(() => { closeFn(); }, 200); }
+    else inner.style.transform = ""; };
+  grip.addEventListener("pointerdown", e => { start(e, true); grip.setPointerCapture(e.pointerId); });
+  grip.addEventListener("pointermove", move); grip.addEventListener("pointerup", end); grip.addEventListener("pointercancel", end);
+  inner.addEventListener("pointerdown", e => { if (!e.target.closest(".griparea")) start(e, false); });
+  inner.addEventListener("pointermove", move, { passive: false }); inner.addEventListener("pointerup", end); inner.addEventListener("pointercancel", end);
+}
+installSheetDrag("modal", () => closeModal()); installSheetDrag("cmodal", () => closeCModal());
+function closeModal(){ hideSheet("modal"); }
 
 /* ---------- 충전 상세 시트 ---------- */
-function closeCModal(){ document.getElementById("cmodal").classList.remove("on"); }
+function closeCModal(){ hideSheet("cmodal"); }
 function niceStep(range, target) {
   const raw = range / target;
   if (!(raw > 0)) return 1;
@@ -945,57 +1321,81 @@ function smoothPts(src, win) {
     return [p[0], sum / cnt];
   });
 }
-/* 충전 속도 곡선. y축은 데이터에 맞춰 자동 확대 (완속처럼 변동이 작을 때 0부터 그리면 일자로 보인다) */
-function drawProfileChart(svgId, pts, dc) {
+/* 충전 타임라인 (2026-09-22, 사용자: "폰도 차량 앱 ChargeStripView와 똑같이"). 차량 앱과 같은 구성:
+   위 = 전력 곡선(축 없음, 0~최대) + 최고점 점·"최대 N kW · M분" / 가운데 = 열 띠(전력이 셀수록 진하게, 양 끝 배터리 %) /
+   아래 = 0분·중간·끝 눈금 + "평균 N kW · 10분당 +x.x%". 열릴 때 왼쪽→오른쪽으로 900ms 드러남. 급속 주황 / 완속 파랑 */
+function drawChargeStrip(svgId, pts, dc, socStart, socEnd) {
   const svg = document.getElementById(svgId);
   let W = Math.round(svg.getBoundingClientRect().width);
-  if (!W || W < 100) W = Math.round(svg.parentElement.getBoundingClientRect().width) || 400;
+  if (!W || W < 100) W = Math.round(svg.parentElement.getBoundingClientRect().width) || 360;
   let H = Math.round(svg.getBoundingClientRect().height);
   if (!H || H < 80) H = 220;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   if (!pts || pts.length < 2) {
-    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="var(--muted)" font-size="14" text-anchor="middle">충전 속도 데이터가 없습니다</text>`;
+    svg.innerHTML = `<text x="${W/2}" y="${H/2}" fill="var(--muted)" font-size="14" text-anchor="middle">충전 속도 기록이 없습니다</text>`;
     return;
   }
-  const color = dc ? "#FF7500" : "#4DA3FF", fillc = dc ? "rgba(255,117,0,.14)" : "rgba(77,163,255,.14)";
-  const padT = 20, padB = 26, padL = 8, padR = 14;
-  const chartW = W - padL - padR, chartH = H - padT - padB;
-  const dataMax = Math.max(...pts.map(p=>p[1])), dataMin = Math.min(...pts.map(p=>p[1]));
-  const maxMin = Math.max(...pts.map(p=>p[0]), 1);
-  const zoom = dataMin > 0 && (dataMax - dataMin) < dataMax * 0.35;
-  const span = Math.max(zoom ? dataMax - dataMin : dataMax, 0.1);
-  const step = niceStep(span * 1.15, 4);
-  const yMin = zoom ? Math.floor(dataMin/step)*step : 0;
-  let yMax = Math.ceil(dataMax/step)*step;
-  if (yMax <= yMin) yMax = yMin + step;
-  const px = m => padL + (m/maxMin)*chartW;
-  const py = k => padT + chartH - ((k-yMin)/(yMax-yMin))*chartH;
-  const fmtKw = v => v < 0.05 ? "0" : v < 10 ? v.toFixed(1) : v.toFixed(0);
-  const toPath = src => src.map((p,i)=>`${i===0?"M":"L"}${px(p[0]).toFixed(1)},${py(p[1]).toFixed(1)}`).join(" ");
-  const ticks = Math.round((yMax-yMin)/step);
-  let grid = "";
-  for (let i = 0; i <= ticks; i++) {
-    const v = yMin + step*i, gy = py(v).toFixed(1);
-    grid += `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="#2A2B30" stroke-dasharray="6 6" stroke-width="1"></line>
-      <text x="${padL}" y="${gy-4}" fill="var(--muted)" font-size="12">${fmtKw(v)}${i===ticks?" kW":""}</text>`;
+  pts = pts.slice().sort((a, b) => a[0] - b[0]);
+  const color = dc ? "#FF7500" : "#4DA3FF";
+  const totalMin = Math.max(pts[pts.length-1][0], 1);
+  const maxKw = Math.max(1, ...pts.map(p => p[1]));
+  const kwAt = m => {
+    if (m <= pts[0][0]) return pts[0][1];
+    for (let i = 1; i < pts.length; i++) {
+      const [m0, k0] = pts[i-1], [m1, k1] = pts[i];
+      if (m <= m1) { const f = m1 > m0 ? (m - m0) / (m1 - m0) : 0; return k0 + (k1 - k0) * f; }
+    }
+    return pts[pts.length-1][1];
+  };
+  let sum = 0, n = 0; for (let m = 0; m <= totalMin; m += 0.5) { sum += kwAt(m); n++; }
+  const avgKw = n ? sum / n : 0;
+  const peak = pts.reduce((a, b) => b[1] > a[1] ? b : a, pts[0]);
+  const socW = 58, x0 = socW, x1 = W - socW, cw = x1 - x0;
+  const x = m => x0 + (m / totalMin) * cw;
+  const curveTop = 26, curveH = 66, curveBase = curveTop + curveH;
+  const stripTop = curveBase + 16, stripH = 34;
+  const tickY = stripTop + stripH + 18, infoY = tickY + 26;
+  const uid = "cs" + Math.floor(Math.random() * 1e6);
+  // 곡선
+  let d = "";
+  for (let i = 0; i <= 120; i++) { const m = totalMin * i / 120; d += (i ? "L" : "M") + x(m).toFixed(1) + "," + (curveBase - (kwAt(m) / maxKw) * curveH).toFixed(1) + " "; }
+  // 열 띠 조각 (차량 앱과 같은 90조각, 알파 = 0.24~1.0)
+  let segs = "";
+  for (let i = 0; i < 90; i++) {
+    const ma = totalMin * i / 90, mb = totalMin * (i + 1) / 90;
+    const k = kwAt((ma + mb) / 2) / maxKw;
+    segs += `<rect x="${x(ma).toFixed(1)}" y="${stripTop}" width="${(x(mb) - x(ma) + 0.6).toFixed(2)}" height="${stripH}" fill="${color}" opacity="${((60 + 195 * k) / 255).toFixed(2)}"></rect>`;
   }
-  const win = Math.max(1, Math.round(pts.length/40));
-  const trend = win > 1 ? smoothPts(pts, win) : pts;
-  const raw = win > 1 ? `<path d="${toPath(pts)}" fill="none" stroke="${color}" opacity=".35" stroke-width="1.5"></path>` : "";
-  const base = (padT+chartH).toFixed(1);
-  const area = zoom ? "" : `<path d="M${px(trend[0][0]).toFixed(1)},${base} ${toPath(trend).replace(/^M/, "L")} L${px(trend[trend.length-1][0]).toFixed(1)},${base} Z" fill="${fillc}"></path>`;
-  const peak = pts.reduce((a,b)=>b[1]>a[1]?b:a, pts[0]);
-  svg.innerHTML = `${grid}${area}${raw}
-    <path d="${toPath(trend)}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
-    <circle cx="${px(peak[0]).toFixed(1)}" cy="${py(peak[1]).toFixed(1)}" r="4" fill="${color}"></circle>
-    <text x="${padL}" y="${H-7}" fill="var(--muted)" font-size="12">0분</text>
-    <text x="${padL+chartW/2}" y="${H-7}" fill="var(--muted)" font-size="12" text-anchor="middle">${Math.round(maxMin/2)}분</text>
-    <text x="${W-padR}" y="${H-7}" fill="var(--muted)" font-size="12" text-anchor="end">${Math.round(maxMin)}분</text>`;
+  const peakX = x(peak[0]), peakY = curveTop;
+  const anchor = peak[0] > totalMin * 0.7 ? "end" : peak[0] < totalMin * 0.3 ? "start" : "middle";
+  const socTxt = v => v == null ? "-" : Math.round(v) + "%";
+  let info = `평균 ${Math.round(avgKw)} kW`;
+  if (socStart != null && socEnd != null && totalMin > 1) info += `   ·   10분당 +${((socEnd - socStart) / totalMin * 10).toFixed(1)}%`;
+  svg.innerHTML = `
+    <defs>
+      <clipPath id="${uid}-r"><rect x="${x0}" y="0" width="0" height="${H}"><animate attributeName="width" from="0" to="${cw + 2}" dur="0.9s" fill="freeze" calcMode="spline" keySplines="0.2 0.7 0.3 1"/></rect></clipPath>
+      <clipPath id="${uid}-s"><rect x="${x0}" y="${stripTop}" width="${cw}" height="${stripH}" rx="9"></rect></clipPath>
+    </defs>
+    <line x1="${x0}" y1="${curveBase}" x2="${x1}" y2="${curveBase}" stroke="#2A2A2E" stroke-width="1"></line>
+    <g clip-path="url(#${uid}-r)">
+      <path d="${d}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+      <g clip-path="url(#${uid}-s)"><rect x="${x0}" y="${stripTop}" width="${cw}" height="${stripH}" fill="#1E1E22"></rect>${segs}</g>
+    </g>
+    <g opacity="0"><animate attributeName="opacity" from="0" to="1" begin="0.85s" dur="0.25s" fill="freeze"/>
+      <circle cx="${peakX.toFixed(1)}" cy="${peakY}" r="5" fill="${color}"></circle>
+      <text x="${peakX.toFixed(1)}" y="${peakY - 10}" fill="var(--text)" font-size="14" font-weight="500" text-anchor="${anchor}">최대 ${Math.round(maxKw)} kW · ${Math.round(peak[0])}분</text>
+    </g>
+    <text x="${x0 - 8}" y="${stripTop + stripH/2 + 8}" fill="var(--text)" font-size="23" font-weight="300" text-anchor="end">${socTxt(socStart)}</text>
+    <text x="${x1 + 8}" y="${stripTop + stripH/2 + 8}" fill="var(--text)" font-size="23" font-weight="300">${socTxt(socEnd)}</text>
+    <text x="${x0}" y="${tickY}" fill="var(--muted)" font-size="12">0분</text>
+    <text x="${x0 + cw/2}" y="${tickY}" fill="var(--muted)" font-size="12" text-anchor="middle">${Math.round(totalMin/2)}분</text>
+    <text x="${x1}" y="${tickY}" fill="var(--muted)" font-size="12" text-anchor="end">${Math.round(totalMin)}분</text>
+    <text x="${x0}" y="${infoY}" fill="var(--text)" font-size="14" font-weight="500">${info}</text>`;
 }
 function openChargeDetail(clientId) {
   const r = allCharges.find(x => x.client_id === clientId);
   if (!r) return;
-  document.getElementById("cmodal").classList.add("on");
+  sheetOpened("cmodal");
   document.getElementById("cmodal-title").textContent = fmtDt(r.start_ts) + " 충전";
   const t = document.getElementById("cmodal-type");
   t.textContent = "● " + (r.type === "DC" ? "급속" : "완속"); t.className = "typetxt " + r.type;
@@ -1005,33 +1405,71 @@ function openChargeDetail(clientId) {
   const cells = [
     cell("time", "시간", fmtDur(r.end_ts - r.start_ts)),
     cell("battery", "배터리", r.soc_start!=null&&r.soc_end!=null ? `${Math.round(r.soc_start)} → ${Math.round(r.soc_end)}%` : "-"),
-    cell("won", "단가", r.kwh>0.01 ? big((r.cost/r.kwh).toFixed(1), "원/kWh") : "-"),
+    cell("won", "단가", meterKwh(r)>0.01 ? big((r.cost/meterKwh(r)).toFixed(1), "원/kWh") : "-"),
     cell("speed", "최대 전력", big(r.max_kw, "kW")),
-    cell("station", "충전소", r.station || "미확인", "sm")
+    r.kind ? cell(r.kind === "home" ? "home" : "work", "내 충전기", kindLabel(r.kind), "sm") : cell("station", "충전소", r.station || "미확인", "sm")
   ];
   document.getElementById("cmodal-grid").innerHTML = cells.join("");
+  document.getElementById("cd-kind-note").textContent = !r.kind ? "" :
+    r.type === "AC" ? `계량 약 ${meterKwh(r).toFixed(1)} kWh (배터리 ${r.kwh.toFixed(1)} kWh · 완속 충전기 효율 88% 기준) — 요금은 계량 kWh 기준` : `급속 · 배터리 ${r.kwh.toFixed(1)} kWh 그대로`;
+  editingChargeId = clientId;
+  csSetupSection(r);
+  document.getElementById("cd-edit-name").value = r.station || "";
+  document.getElementById("cd-edit-rate").value = r.kwh > 0.01 ? (r.cost / r.kwh).toFixed(1) : "";
+  document.getElementById("cd-edit-msg").textContent = "";
   let pts = [];
   try { pts = typeof r.profile === "string" ? JSON.parse(r.profile||"[]") : (r.profile||[]); } catch(e) { pts = []; }
-  setTimeout(()=>drawProfileChart("charge-profile", pts, r.type === "DC"), 60);
+  setTimeout(()=>drawChargeStrip("charge-profile", pts, r.type === "DC", r.soc_start, r.soc_end), 60);
+}
+/* 폰에서 단가·충전소 수정 → 서버 charge 행 갱신 + edited_ts. 차량이 다음 동기화 때 받아가 자기 기록과 충전소 기억값에 반영 (2026-09-21 양방향) */
+let editingChargeId = null;
+async function saveChargeEdit() {
+  const r = allCharges.find(x => x.client_id === editingChargeId);
+  const msg = document.getElementById("cd-edit-msg");
+  if (!r) return;
+  const name = document.getElementById("cd-edit-name").value.trim();
+  const rate = parseFloat(document.getElementById("cd-edit-rate").value);
+  if (!(rate > 0)) { msg.textContent = "단가를 숫자로 입력하세요"; return; }
+  const cost = Math.round(r.kwh * rate);
+  msg.textContent = "저장 중…";
+  const res = await sb.from("charge").update({ cost, station: name || null, edited_ts: Date.now() })
+    .eq("device_id", DEV).eq("client_id", r.client_id);
+  if (res.error) {
+    msg.textContent = /edited_ts/.test(res.error.message) ? "서버에 edited_ts 컬럼이 없습니다 — supabase_setup.sql v5의 alter 한 줄을 실행하세요" : "저장 실패: " + res.error.message;
+    return;
+  }
+  r.cost = cost; r.station = name || null;
+  msg.textContent = "저장됨 · 차량은 다음 동기화 때 반영됩니다";
+  openChargeDetail(r.client_id); cRender();
+  document.getElementById("cd-edit-msg").textContent = "저장됨 · 차량은 다음 동기화 때 반영됩니다";
 }
 
 /* ---------- 시작 ---------- */
 /* 기본값 내장 (2026-08-07 사용자 결정, 개인용 전제) — 이 파일을 공개 장소에 올리지 말 것.
    주소 뒤에 #setup 을 붙여 열면 설정 화면이 나옴 (차량 ID 변경용) */
 const DEFAULT_CFG = {
-  u: "",   // Supabase Project URL (비워 두면 첫 화면에서 입력)
-  k: "",   // anon public 키
-  d: "",   // 차량 ID (차량 앱 설정 화면의 값)
-  v: ""    // VWorld 지도 키 (선택)
+  u: "",
+  k: "",
+  d: "",  // 차량 ID (차량 앱 설정 화면의 값과 같게)
+  g: "",   // 충전소 정보 API 키 (data.go.kr, 폰 지도 선택용, 2026-09-22)
+  v: ""   // VWorld 지도 키
 };
-window.addEventListener("load", ()=>{
+window.addEventListener("load", async ()=>{
   const forceSetup = location.hash === "#setup";
-  const saved = (!forceSetup && loadHash()) || DEFAULT_CFG;
+  const saved = (!forceSetup && (loadHash() || loadStoredCfg())) || DEFAULT_CFG;
   document.getElementById("in-url").value = saved.u || "";
   document.getElementById("in-key").value = saved.k || "";
   document.getElementById("in-dev").value = saved.d || "";
   document.getElementById("in-vw").value = saved.v || "";
-  if (!forceSetup && saved.u && saved.k && saved.d) init(saved.u, saved.k, saved.d, saved.v || "");
+  document.getElementById("in-dg").value = saved.g || "";
+  if (forceSetup || !(saved.u && saved.k && saved.d)) return;   // 연결 정보가 없을 때만 설정 화면
+  // 저장된 연결이 있으면 설정 화면을 보이지 않고 바로 접속. 앱 시작 직후 네트워크가 늦게 붙는 경우가 있어 1.5초 간격 3번 (2026-09-25)
+  document.getElementById("setup").style.display = "none"; document.getElementById("boot").style.display = "block";
+  for (let i = 0; i < 3; i++) {
+    if (await init(saved.u, saved.k, saved.d, saved.v || "", saved.g || "")) { document.getElementById("boot").style.display = "none"; return; }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  document.getElementById("boot").style.display = "none"; document.getElementById("setup").style.display = "block";
 });
 </script>
 </body>
