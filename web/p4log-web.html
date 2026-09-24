@@ -122,7 +122,8 @@
   #map, #tripmap { height:240px; border-radius:2px; position:relative; z-index:0; background:#141414; }
   #park-photo { display:none; width:100%; border-radius:2px; margin-top:10px; }
   /* 소모품 */
-  .cons { padding:14px 0; border-bottom:1px solid var(--line); }
+  .cons { padding:14px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  .cons:active { background:#0E0E10; }
   .cons .h { display:flex; align-items:baseline; gap:10px; }
   .cons .h .n { font-size:16px; font-weight:500; flex:1; }
   .cons .h .st { font-size:13.5px; font-weight:500; color:var(--muted); }
@@ -409,6 +410,21 @@
   </div>
   <button class="morebtn" style="display:block" onclick="saveChargeEdit()">저장 — 차량에도 반영</button>
   <div id="cd-edit-msg"></div>
+</div></div>
+
+<!-- 소모품 수정 시트 (2026-09-25, 사용자: "밑에 계속 있는 게 아니라 누르면 팝업으로") — 다른 시트와 같은 손잡이·뒤로가기 규칙 -->
+<div id="cons-sheet" class="sheet" onclick="if(event.target===this)consEditClose()"><div class="inner">
+  <div class="griparea"><div class="grip"></div></div>
+  <div class="head"><b id="cons-edit-title"></b><span class="close" onclick="consEditClose()">✕</span></div>
+  <div style="font-size:12.5px;color:var(--muted);line-height:1.5">기본값은 참고용입니다. 폴스타 정비 안내나 실제 교체 시점에 맞춰 고치세요. 저장하면 차량에도 반영됩니다.</div>
+  <div class="editrow"><span style="align-self:center;color:var(--sub);font-size:15px">교체 주기 (km, 0=없음)</span><input id="ce-km" type="number" inputmode="numeric"></div>
+  <div class="editrow"><span style="align-self:center;color:var(--sub);font-size:15px">교체 주기 (개월, 0=없음)</span><input id="ce-mo" type="number" inputmode="numeric"></div>
+  <div class="editrow"><span style="align-self:center;color:var(--sub);font-size:15px">지금까지 사용한 km</span><input id="ce-used" type="number" inputmode="numeric"></div>
+  <div style="display:flex;gap:10px">
+    <button class="morebtn accent" style="display:block" onclick="consSave(false)">저장</button>
+    <button class="morebtn" style="display:block" onclick="consSave(true)">교체함 — 0부터</button>
+  </div>
+  <div id="cons-edit-msg" style="font-size:13px;color:var(--muted);margin-top:8px;min-height:18px"></div>
 </div></div>
 
 <div id="tooltip"></div>
@@ -1136,9 +1152,39 @@ async function loadUsage() {
 }
 
 /* ---------- 소모품 (차량 탭과 같은 색 단계: 여유 흰색 → 곧 교체 주황 → 교체 필요 빨강) ---------- */
+let consRows = [], consEditName = null;
+function consEdit(name) {
+  const r = consRows.find(x => x.name === name); if (!r) return;
+  consEditName = name;
+  document.getElementById("cons-edit-title").textContent = r.name + " — 주기·사용량 수정";
+  document.getElementById("ce-km").value = r.cycle_km || 0;
+  document.getElementById("ce-mo").value = r.cycle_months || 0;
+  document.getElementById("ce-used").value = Math.round(r.used_km || 0);
+  document.getElementById("cons-edit-msg").textContent = "";
+  sheetOpened("cons-sheet");
+}
+function consEditClose() { consEditName = null; hideSheet("cons-sheet"); }
+/* 저장/교체함: 기준점(base_km/base_ts)을 바꾸고 edited_ts 를 찍는다 → 차량이 다음 동기화 때 받아간다.
+   차량의 현재 누적 km 는 서버에 없으므로 base_km + used_km 로 되살린다 (차량이 올린 마지막 스냅샷 기준) */
+async function consSave(reset) {
+  const r = consRows.find(x => x.name === consEditName), msg = document.getElementById("cons-edit-msg"); if (!r) return;
+  if (r.base_km == null) { msg.textContent = "차량이 아직 소모품 기준값을 올리지 않았어요 — 차량 설정의 [지금 올리기] 뒤에 다시 시도하세요"; return; }
+  const ck = parseInt(document.getElementById("ce-km").value) || 0, cm = parseInt(document.getElementById("ce-mo").value) || 0;
+  const used = reset ? 0 : (parseFloat(document.getElementById("ce-used").value) || 0);
+  if (ck < 0 || cm < 0 || used < 0) { msg.textContent = "숫자를 확인하세요"; return; }
+  const total = (r.base_km || 0) + (r.used_km || 0), now = Date.now();
+  const base_km = total - used, base_ts = reset ? now : (r.base_ts || now);
+  const remain_months = cm > 0 ? cm - (now - base_ts) / (30.44 * 24 * 3600000) : null;
+  msg.textContent = "저장 중…";
+  const res = await sb.from("consumable").update({ cycle_km: ck, cycle_months: cm, base_km, base_ts, used_km: Math.round(used), remain_km: ck > 0 ? Math.round(ck - used) : null,
+    remain_months, edited_ts: now, updated_ts: now }).eq("device_id", DEV).eq("name", r.name);
+  if (res.error) { msg.textContent = /base_km|base_ts|edited_ts/.test(res.error.message) ? "서버에 v10 컬럼이 없습니다 — supabase_setup.sql v10의 alter 한 줄을 실행하세요" : "저장 실패: " + res.error.message; return; }
+  consEditClose(); await loadConsumables();
+}
 async function loadConsumables() {
   const res = await sb.from("consumable").select("*").eq("device_id", DEV).order("name");
   const list = res.data || [];
+  consRows = list;
   document.getElementById("cons-list").innerHTML = list.length ? list.map(r=>{
     let ratio = 0, remain = "-";
     const parts = [];
@@ -1148,7 +1194,7 @@ async function loadConsumables() {
       if (!(r.cycle_km > 0)) remain = r.remain_months.toFixed(1) + "개월"; parts.push(`${r.remain_months.toFixed(1)}개월 남음 (주기 ${r.cycle_months}개월)`); }
     const st = ratio >= 1 ? ["교체 필요", "#FF5C5C"] : ratio >= 0.85 ? ["곧 교체", "#FF7500"] : [`${Math.round(ratio*100)}% 사용`, "#8E8E93"];
     const bar = ratio >= 0.85 ? st[1] : "#F2F2F2";
-    return `<div class="cons"><div class="h"><span class="n">${r.name}</span><span class="st" style="color:${st[1]}">${st[0]}</span><span class="rm">${remain}</span></div>
+    return `<div class="cons" onclick="consEdit('${r.name.replace(/'/g, "")}')"><div class="h"><span class="n">${r.name}</span><span class="st" style="color:${st[1]}">${st[0]}</span><span class="rm">${remain}</span></div>
       <div class="d">${parts.join(" · ")}</div><div class="bar"><i style="width:${Math.min(100, Math.max(0, ratio*100))}%;background:${bar}"></i></div></div>`;
   }).join("") : `<div class="empty">${ic("log", 30)}<span>아직 올라온 소모품 정보가 없습니다</span></div>`;
 }
@@ -1281,7 +1327,7 @@ window.addEventListener("popstate", () => {
   if (ignorePop) { ignorePop = false; return; }
   if (sheetHist > 0) {
     sheetHist--;
-    for (const id of ["modal", "cmodal"]) { const el = document.getElementById(id); el.classList.remove("on");
+    for (const id of ["modal", "cmodal", "cons-sheet"]) { const el = document.getElementById(id); el.classList.remove("on");
       const inner = el.querySelector(".inner"); inner.style.transform = ""; inner.classList.remove("dragging", "settle"); }
   }
 });
@@ -1301,7 +1347,7 @@ function installSheetDrag(id, closeFn) {
   inner.addEventListener("pointerdown", e => { if (!e.target.closest(".griparea")) start(e, false); });
   inner.addEventListener("pointermove", move, { passive: false }); inner.addEventListener("pointerup", end); inner.addEventListener("pointercancel", end);
 }
-installSheetDrag("modal", () => closeModal()); installSheetDrag("cmodal", () => closeCModal());
+installSheetDrag("modal", () => closeModal()); installSheetDrag("cmodal", () => closeCModal()); installSheetDrag("cons-sheet", () => consEditClose());
 function closeModal(){ hideSheet("modal"); }
 
 /* ---------- 충전 상세 시트 ---------- */

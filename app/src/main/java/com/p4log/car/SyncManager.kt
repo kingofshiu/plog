@@ -172,7 +172,9 @@ object SyncManager {
             // 다른 게 실패했을 때야말로 로그가 필요하기 때문이다
             uploadServiceLog(context, url, key, deviceId)
 
-            // 소모품 현황 스냅샷
+            // 소모품: 폰에서 고친 것 먼저 받고(2026-09-25 양방향) → 현황 스냅샷 올리기
+            if (failMsg == null) pullConsumableEdits(context, url, key, deviceId, db)
+            var consExtra = true   // 서버 v10 base_km/base_ts/edited_ts
             if (failMsg == null) {
                 val totalKm = Prefs.totalKm(context)
                 val now = System.currentTimeMillis()
@@ -195,8 +197,15 @@ object SyncManager {
                         else JSONObject.NULL
                     )
                     row.put("updated_ts", now)
-                    if (upsert(url, key, "consumable", "device_id,name", row)) okCount++
-                    else { failMsg = "consumable 업로드 실패"; break }
+                    if (consExtra) { row.put("base_km", cons.baseKm); row.put("base_ts", cons.baseTs); row.put("edited_ts", cons.editedTs) }
+                    var ok = upsert(url, key, "consumable", "device_id,name", row)
+                    if (!ok && consExtra && (lastUpsertError ?: "").contains("column")) {
+                        consExtra = false
+                        row.remove("base_km"); row.remove("base_ts"); row.remove("edited_ts")
+                        ServiceLog.add(context, "동기화: 서버 consumable 테이블에 base_km/base_ts/edited_ts 컬럼 없음 — 빼고 올림 (supabase_setup.sql v10 실행 필요)")
+                        ok = upsert(url, key, "consumable", "device_id,name", row)
+                    }
+                    if (ok) okCount++ else { failMsg = "consumable 업로드 실패"; break }
                 }
             }
         } catch (e: Throwable) {
@@ -331,6 +340,47 @@ object SyncManager {
             conn.disconnect()
         } catch (e: Throwable) { /* 저장소는 못 재도 DB 줄은 보여준다 */ }
         return Usage(dbBytes, storeBytes, trips, charges, dbErr)
+    }
+
+    @Volatile private var consPullMissingLogged = false
+
+    /**
+     * 폰에서 고친 소모품 받기 (2026-09-25): 서버 consumable 행의 edited_ts 가 차량 것보다 크면 주기·기준점을 덮어쓴다.
+     * 서버 v10(base_km/base_ts/edited_ts) 전엔 400 → 한 번만 로그. 그 뒤 스냅샷 업로드가 최신 상태를 다시 올린다
+     */
+    private fun pullConsumableEdits(context: Context, baseUrl: String, key: String, deviceId: String, db: Db) {
+        try {
+            val conn = URL("$baseUrl/rest/v1/consumable?device_id=eq.$deviceId&select=name,cycle_km,cycle_months,base_km,base_ts,edited_ts").openConnection() as HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.setRequestProperty("apikey", key)
+            conn.setRequestProperty("Authorization", "Bearer $key")
+            conn.connectTimeout = 8000; conn.readTimeout = 15_000
+            val code = conn.responseCode
+            if (code != 200) {
+                if (code == 400 && !consPullMissingLogged) {
+                    consPullMissingLogged = true
+                    ServiceLog.add(context, "소모품 양방향: 서버 consumable 테이블에 base_km/edited_ts 컬럼 없음 — supabase_setup.sql v10 실행 필요")
+                }
+                conn.disconnect(); return
+            }
+            val body = conn.inputStream.bufferedReader().readText()
+            conn.disconnect()
+            val arr = JSONArray(body)
+            val local = db.consumables().associateBy { it.name }
+            var applied = 0
+            for (i in 0 until arr.length()) {
+                val o = arr.getJSONObject(i)
+                val l = local[o.optString("name")] ?: continue
+                val ets = o.optLong("edited_ts", 0L)
+                if (ets <= l.editedTs || o.isNull("base_km") || o.isNull("base_ts")) continue
+                db.applyRemoteConsumable(l.name, o.optLong("cycle_km", l.cycleKm), o.optLong("cycle_months", l.cycleMonths),
+                    o.optDouble("base_km", l.baseKm), o.optLong("base_ts", l.baseTs), ets)
+                applied++
+            }
+            if (applied > 0) ServiceLog.add(context, "폰에서 수정한 소모품 " + applied + "건 반영")
+        } catch (e: Throwable) {
+            Log.w(TAG, "pullConsumableEdits failed", e)
+        }
     }
 
     /** 서버 테이블에 컬럼이 있는지 (SELECT 컬럼 LIMIT 1 → 200이면 있음). 소급 업로드 판정용 (2026-09-22) */

@@ -10,7 +10,7 @@
 
     <TextView
         style="@style/HeroLabel"
-        android:text="소모품 · 행을 누르면 사용량 보정"
+        android:text="소모품 · 행을 누르면 주기·사용량 수정 · 기본값은 참고용"
         android:drawableStart="@drawable/ic_st_log" />
 
     <ListView

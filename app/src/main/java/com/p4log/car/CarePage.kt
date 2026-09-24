@@ -90,23 +90,40 @@ class CarePage(private val host: AppHost, root: View) : PageController {
         listView.adapter = adapter
     }
 
+    /**
+     * 주기·사용량 수정 (2026-09-25, 사용자: "리셋하거나 km를 적을 수 있게, 폰과 양방향"):
+     * 교체 주기 km / 개월 / 지금까지 사용한 km 를 한 번에. 기본값은 참고용이라 폴스타 정비 안내·실제 교체에 맞춰 고친다.
+     * 저장하면 edited_ts 가 찍혀 다음 동기화에 서버로 가고, 폰에서 고친 게 더 새 것이면 차량이 받아온다.
+     */
     private fun showEditDialog(c: Consumable) {
-        val input = EditText(ctx)
-        input.inputType = InputType.TYPE_CLASS_NUMBER
-        input.hint = "이미 사용한 km"
-        val usedKm = Math.max(0.0, totalKm - c.baseKm)
-        input.setText(Math.round(usedKm).toString())
+        val dp = ctx.resources.displayMetrics.density
+        val box = android.widget.LinearLayout(ctx)
+        box.orientation = android.widget.LinearLayout.VERTICAL
+        box.setPadding((20 * dp).toInt(), (8 * dp).toInt(), (20 * dp).toInt(), 0)
+        fun field(label: String, value: String): EditText {
+            val tv = android.widget.TextView(ctx); tv.text = label; tv.textSize = 19f; tv.setTextColor(android.graphics.Color.parseColor("#C9C9CE"))
+            tv.setPadding(0, (12 * dp).toInt(), 0, 0)
+            val e = EditText(ctx); e.inputType = InputType.TYPE_CLASS_NUMBER; e.setText(value); e.textSize = 24f
+            e.setTextColor(android.graphics.Color.parseColor("#F2F2F2"))
+            box.addView(tv); box.addView(e); return e
+        }
+        val km = field("교체 주기 (km) — 0이면 km 기준 없음", c.cycleKm.toString())
+        val mo = field("교체 주기 (개월) — 0이면 개월 기준 없음", c.cycleMonths.toString())
+        val used = field("지금까지 사용한 km", Math.round(Math.max(0.0, totalKm - c.baseKm)).toString())
         host.showDialog(
             AlertDialog.Builder(ctx)
-                .setTitle("${c.name} — 사용량 보정")
-                .setMessage("이 부품을 이미 사용한 거리를 입력하세요.")
-                .setView(input)
+                .setTitle(c.name + " — 주기·사용량 수정")
+                .setMessage("기본값은 참고용입니다. 폴스타 정비 안내나 실제 교체 시점에 맞춰 고치세요. 폰 앱에서도 고칠 수 있고 서로 반영됩니다.")
+                .setView(box)
                 .setPositiveButton("저장") { _, _ ->
-                    val v = input.text.toString().toDoubleOrNull()
-                    if (v != null && v >= 0) {
-                        Db.get(ctx).setConsumableUsedKm(c.id, totalKm, v)
-                        reload()
+                    val ck = km.text.toString().toLongOrNull(); val cm = mo.text.toString().toLongOrNull(); val u = used.text.toString().toDoubleOrNull()
+                    if (ck == null || cm == null || u == null || ck < 0 || cm < 0 || u < 0) {
+                        android.widget.Toast.makeText(ctx, "숫자를 확인하세요", android.widget.Toast.LENGTH_SHORT).show(); return@setPositiveButton
                     }
+                    val db = Db.get(ctx)
+                    db.updateConsumableCycle(c.id, ck, cm)
+                    db.setConsumableUsedKm(c.id, totalKm, u)
+                    reload()
                 }
                 .setNegativeButton("취소", null)
         )

@@ -13,7 +13,7 @@ import android.database.sqlite.SQLiteOpenHelper
  * v5: trip.regen_kwh 회생제동으로 회수한 에너지 (2026-09-05, 주행 탭 표시용. 서버엔 아직 안 올림)
  * v6: trip.start_place / end_place 출발·도착 동네 이름 (2026-09-06, 주행 기록 목록용. 서버엔 안 올림)
  */
-class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log.db", null, 9) {
+class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log.db", null, 10) {
 
     /**
      * 매번 열릴 때 인덱스 보장 (2026-09-08, 기록이 쌓여도 기간 조회가 느려지지 않게).
@@ -73,6 +73,7 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                 "cycle_km INTEGER NOT NULL DEFAULT 0," +
                 "cycle_months INTEGER NOT NULL DEFAULT 0," +
                 "base_km REAL NOT NULL DEFAULT 0," +
+                "edited_ts INTEGER NOT NULL DEFAULT 0," +
                 "base_ts INTEGER NOT NULL DEFAULT 0)"
         )
         db.execSQL(
@@ -136,6 +137,10 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         if (oldVersion < 9) {
             // v8 -> v9: 충전 위치 동네 이름 (주행의 start_place 처럼, 2026-09-25). 기존 충전은 NULL -> 목록에서 볼 때 채운다
             db.execSQL("ALTER TABLE charge ADD COLUMN place TEXT")
+        }
+        if (oldVersion < 10) {
+            // v9 -> v10: 소모품 양방향 동기화 — 마지막 수정 시각 (2026-09-25). 폰 수정이 더 새 것이면 받아온다
+            db.execSQL("ALTER TABLE consumable ADD COLUMN edited_ts INTEGER NOT NULL DEFAULT 0")
         }
     }
 
@@ -472,7 +477,8 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
                         cycleKm = it.getLong(it.getColumnIndexOrThrow("cycle_km")),
                         cycleMonths = it.getLong(it.getColumnIndexOrThrow("cycle_months")),
                         baseKm = it.getDouble(it.getColumnIndexOrThrow("base_km")),
-                        baseTs = it.getLong(it.getColumnIndexOrThrow("base_ts"))
+                        baseTs = it.getLong(it.getColumnIndexOrThrow("base_ts")),
+                        editedTs = it.getLong(it.getColumnIndexOrThrow("edited_ts"))
                     )
                 )
             }
@@ -485,6 +491,7 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         val cv = ContentValues()
         cv.put("base_km", currentTotalKm)
         cv.put("base_ts", System.currentTimeMillis())
+        cv.put("edited_ts", System.currentTimeMillis())
         writableDatabase.update("consumable", cv, "id = ?", arrayOf(id.toString()))
     }
 
@@ -492,6 +499,7 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
     fun setConsumableUsedKm(id: Long, currentTotalKm: Double, usedKm: Double) {
         val cv = ContentValues()
         cv.put("base_km", currentTotalKm - usedKm)
+        cv.put("edited_ts", System.currentTimeMillis())
         writableDatabase.update("consumable", cv, "id = ?", arrayOf(id.toString()))
     }
 
@@ -499,7 +507,16 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, "p4log
         val cv = ContentValues()
         cv.put("cycle_km", cycleKm)
         cv.put("cycle_months", cycleMonths)
+        cv.put("edited_ts", System.currentTimeMillis())
         writableDatabase.update("consumable", cv, "id = ?", arrayOf(id.toString()))
+    }
+
+    /** 폰에서 고친 소모품 반영 (2026-09-25 양방향): 이름으로 찾아 주기·기준점·수정시각을 덮어쓴다 */
+    fun applyRemoteConsumable(name: String, cycleKm: Long, cycleMonths: Long, baseKm: Double, baseTs: Long, editedTs: Long) {
+        val cv = ContentValues()
+        cv.put("cycle_km", cycleKm); cv.put("cycle_months", cycleMonths)
+        cv.put("base_km", baseKm); cv.put("base_ts", baseTs); cv.put("edited_ts", editedTs)
+        writableDatabase.update("consumable", cv, "name = ?", arrayOf(name))
     }
 
     // ---------- 충전소 프로필 ----------

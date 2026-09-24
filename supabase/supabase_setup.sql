@@ -105,8 +105,14 @@ create table if not exists consumable (
   remain_km double precision,
   remain_months double precision,
   updated_ts bigint,
+  base_km double precision,
+  base_ts bigint,
+  edited_ts bigint,
   primary key (device_id, name)
 );
+
+-- v10 (2026-09-25): 소모품 양방향 — 폰에서 주기·사용량·교체를 고치면 edited_ts 로 차량이 받아간다. 기존 서버는 아래 한 줄
+-- alter table consumable add column if not exists base_km double precision, add column if not exists base_ts bigint, add column if not exists edited_ts bigint;
 
 -- 조회 인덱스
 create index if not exists trip_dev_ts on trip (device_id, start_ts desc);

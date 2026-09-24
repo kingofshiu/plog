@@ -108,7 +108,8 @@ data class Consumable(
     val cycleKm: Long,        // 0이면 km 기준 없음
     val cycleMonths: Long,    // 0이면 개월 기준 없음
     val baseKm: Double,       // 마지막 교체 시점의 누적주행(km)
-    val baseTs: Long          // 마지막 교체 시각
+    val baseTs: Long,         // 마지막 교체 시각
+    val editedTs: Long = 0    // 마지막 수정 시각 — 폰과 양방향 동기화 기준 (v10, 2026-09-25)
 )
 
 data class ParkingInfo(

@@ -19,7 +19,7 @@ USB로 설치하며, 차량 앱은 외부 라이브러리 없이 플랫폼 API�
   완속은 계량기 기준(배터리에 들어간 kWh ÷ 0.88)으로 요금을 셉니다.
 - **주행 중 화면** — 앱을 켜 둔 채 출발하면 주행 중에도 앱 화면이 남습니다.
 - **주차 위치·주차 사진** — 기어를 P로 넣는 순간 위치 저장 + 차량 카메라 촬영 → 폰에서 확인.
-- **소모품 관리** — 타이어·브레이크 패드·필터·와이퍼·감속기 오일 교체 주기.
+- **소모품 관리** — 타이어·브레이크 패드·필터·와이퍼·감속기 오일. 기본 주기는 참고값이며 차량·폰 어디서든 주기·사용 km를 고치거나 교체 처리할 수 있고 서로 반영됩니다.
 - **폰 앱 / 웹** — 기록을 Supabase(무료)에 올리고 폰 앱이나 브라우저에서 봅니다. 폰에서 단가·충전소를 고치면 차량에도 반영됩니다(양방향).
   서버를 얼마나 썼는지 막대로 보여 주고, 목록은 쪽수(1 2 3 4 5)로 넘깁니다.
 
@@ -291,6 +291,7 @@ Mac이면: **디스크 유틸리티** → USB 선택 → **지우기** → 포�
    alter table charge add column if not exists st_lat double precision, add column if not exists st_lon double precision;
    alter table charge add column if not exists kind text;
    alter table charge add column if not exists place text;
+   alter table consumable add column if not exists base_km double precision, add column if not exists base_ts bigint, add column if not exists edited_ts bigint;
    create or replace function plog_usage() returns json language sql security definer as $$
      select json_build_object(
        'db_bytes', pg_database_size(current_database()),
