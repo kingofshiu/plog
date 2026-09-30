@@ -19,9 +19,22 @@ android {
         versionName "1.0.0"
     }
 
+    signingConfigs {
+        p4 {
+            storeFile file(P4APP_STORE_FILE)
+            storePassword P4APP_STORE_PASSWORD
+            keyAlias P4APP_KEY_ALIAS
+            keyPassword P4APP_KEY_PASSWORD
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.p4
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.p4
         }
     }
 
