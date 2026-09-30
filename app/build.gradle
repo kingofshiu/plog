@@ -8,7 +8,7 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.p4log.car"
+        applicationId "com.shiu.p4app"
         minSdk 22   // targetSdk 22에 맞춤 (2026-09-05). 실제 대상은 Android 12(폴스타4)
         // targetSdk 22 (2026-09-05): SYSTEM_ALERT_WINDOW 권한 정의에 pre23 플래그가 있어 targetSdk ≤ 22 앱은
         // 설치 시 자동 부여된다(설정 화면 불필요). 폴스타4(Android 12)는 이런 앱 설치를 허용한다(차단은 14부터).

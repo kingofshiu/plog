@@ -72,7 +72,7 @@
         android:anyDensity="true" />
 
     <application
-        android:label="P.Log"
+        android:label="P4 App"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/Theme.P4Log"
         android:resizeableActivity="true"
@@ -142,7 +142,7 @@
             android:theme="@style/Theme.P4Log.Photo"
             android:excludeFromRecents="true"
             android:noHistory="true"
-            android:taskAffinity="com.p4log.car.photo"
+            android:taskAffinity="${applicationId}.photo"
             android:launchMode="singleInstance"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode">
             <meta-data android:name="distractionOptimized" android:value="true" />

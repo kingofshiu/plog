@@ -268,7 +268,7 @@ class CarDataReader(private val context: Context) {
                 ?: return "CarPackageManager 없음"
             val r = pkgMgr.javaClass.getMethod(
                 "isActivityDistractionOptimized", String::class.java, String::class.java
-            ).invoke(pkgMgr, context.packageName, context.packageName + ".MainActivity")
+            ).invoke(pkgMgr, context.packageName, MainActivity::class.java.name)
             r?.toString() ?: "null"
         } catch (e: Throwable) {
             "오류: " + (e.cause ?: e).javaClass.simpleName
